@@ -48,3 +48,18 @@ fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
     }
     return matrix;
 }
+
+fn matrix_delete_2d_u8(matrix: *[][]u8) !void {
+    for (matrix.*) |*row| {
+        // try std.heap.page_allocator.free(row.*);
+        std.heap.page_allocator.free(row.*);
+    }
+    std.heap.page_allocator.free(matrix.*);
+}
+
+test "matrix_create_and_delete" {
+    var matrix = try matrix_create_2d_u8(3, 2);
+    matrix[0][0] = 1;
+    try std.testing.expectEqual(matrix[0][0], 1);
+    try matrix_delete_2d_u8(&matrix);
+}
