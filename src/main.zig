@@ -4,6 +4,8 @@ const stdout = std.io.getStdOut().writer();
 const IMG_WIDTH: u8 = 30;
 const IMG_HEIGHT: u8 = 20;
 
+const mmodule = @import("matrix.zig");
+
 pub const Img = struct {
     width: u32 = undefined,
     height: u32 = undefined,
@@ -25,8 +27,11 @@ pub fn main() !void {
     }
 }
 
-fn image_create(width: u8, height: u8) !Img {
-    var img = Img{
+fn image_create(width: u8, height: u8) !*Img {
+    const allocator = std.heap.page_allocator;
+    const img = try allocator.create(Img);
+
+    img.* = Img{
         .width = width,
         .height = height,
         .r = try matrix_create_2d_u8(width, height),
@@ -37,12 +42,21 @@ fn image_create(width: u8, height: u8) !Img {
     return img;
 }
 
+fn image_delete(img: *Img) !void {
+    try matrix_delete_2d_u8(&img.r);
+    try matrix_delete_2d_u8(&img.g);
+    try matrix_delete_2d_u8(&img.b);
+    try matrix_delete_2d_u8(&img.a);
+    const allocator = std.heap.page_allocator;
+    allocator.destroy(img);
+}
+
 fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
     var matrix: [][]u8 = undefined;
     matrix = try std.heap.page_allocator.alloc([]u8, x);
     for (matrix) |*row| {
         row.* = try std.heap.page_allocator.alloc(u8, y);
-        for (row.*) |_, i| {
+        for (row.*, 0..) |_, i| {
             row.*[i] = 0;
         }
     }
@@ -51,7 +65,6 @@ fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
 
 fn matrix_delete_2d_u8(matrix: *[][]u8) !void {
     for (matrix.*) |*row| {
-        // try std.heap.page_allocator.free(row.*);
         std.heap.page_allocator.free(row.*);
     }
     std.heap.page_allocator.free(matrix.*);
@@ -62,4 +75,12 @@ test "matrix_create_and_delete" {
     matrix[0][0] = 1;
     try std.testing.expectEqual(matrix[0][0], 1);
     try matrix_delete_2d_u8(&matrix);
+}
+
+test "image_create_and_delete" {
+    var img = try image_create(3, 2);
+    img.r[0][0] = 1;
+    try std.testing.expectEqual(img.r[0][0], 1);
+    try image_delete(img);
+    try mmodule.helloworld();
 }
