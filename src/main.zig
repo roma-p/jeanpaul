@@ -52,8 +52,7 @@ fn image_delete(img: *Img) !void {
 }
 
 fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
-    var matrix: [][]u8 = undefined;
-    matrix = try std.heap.page_allocator.alloc([]u8, x);
+    var matrix: [][]u8 = try std.heap.page_allocator.alloc([]u8, x);
     for (matrix) |*row| {
         row.* = try std.heap.page_allocator.alloc(u8, y);
         for (row.*, 0..) |_, i| {
