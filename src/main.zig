@@ -1,85 +1,9 @@
 const std = @import("std");
 const stdout = std.io.getStdOut().writer();
 
+const rgba_img = @import("rgba_img.zig");
+
 const IMG_WIDTH: u8 = 30;
 const IMG_HEIGHT: u8 = 20;
 
-const mmodule = @import("matrix.zig");
-
-pub const Img = struct {
-    width: u32 = undefined,
-    height: u32 = undefined,
-    r: [][]u8 = undefined,
-    g: [][]u8 = undefined,
-    b: [][]u8 = undefined,
-    a: [][]u8 = undefined,
-};
-
-pub fn main() !void {
-    var img: Img = try image_create(IMG_WIDTH, IMG_HEIGHT);
-    img.width = 2;
-    var matrix = try matrix_create_2d_u8(3, 5);
-    for (matrix) |row| {
-        for (row) |value| {
-            try stdout.print("{d}", .{value});
-        }
-        try stdout.print("\n", .{});
-    }
-}
-
-fn image_create(width: u8, height: u8) !*Img {
-    const allocator = std.heap.page_allocator;
-    const img = try allocator.create(Img);
-
-    img.* = Img{
-        .width = width,
-        .height = height,
-        .r = try matrix_create_2d_u8(width, height),
-        .g = try matrix_create_2d_u8(width, height),
-        .b = try matrix_create_2d_u8(width, height),
-        .a = try matrix_create_2d_u8(width, height),
-    };
-    return img;
-}
-
-fn image_delete(img: *Img) !void {
-    try matrix_delete_2d_u8(&img.r);
-    try matrix_delete_2d_u8(&img.g);
-    try matrix_delete_2d_u8(&img.b);
-    try matrix_delete_2d_u8(&img.a);
-    const allocator = std.heap.page_allocator;
-    allocator.destroy(img);
-}
-
-fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
-    var matrix: [][]u8 = try std.heap.page_allocator.alloc([]u8, x);
-    for (matrix) |*row| {
-        row.* = try std.heap.page_allocator.alloc(u8, y);
-        for (row.*, 0..) |_, i| {
-            row.*[i] = 0;
-        }
-    }
-    return matrix;
-}
-
-fn matrix_delete_2d_u8(matrix: *[][]u8) !void {
-    for (matrix.*) |*row| {
-        std.heap.page_allocator.free(row.*);
-    }
-    std.heap.page_allocator.free(matrix.*);
-}
-
-test "matrix_create_and_delete" {
-    var matrix = try matrix_create_2d_u8(3, 2);
-    matrix[0][0] = 1;
-    try std.testing.expectEqual(matrix[0][0], 1);
-    try matrix_delete_2d_u8(&matrix);
-}
-
-test "image_create_and_delete" {
-    var img = try image_create(3, 2);
-    img.r[0][0] = 1;
-    try std.testing.expectEqual(img.r[0][0], 1);
-    try image_delete(img);
-    try mmodule.helloworld();
-}
+pub fn main() !void {}
