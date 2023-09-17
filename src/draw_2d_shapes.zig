@@ -16,7 +16,11 @@ fn max(x: u32, y: u32) u32 {
 
 const BoundingBoxRectangleError = error{OutOfImage};
 
-pub fn compute_bounding_rectangle(img: *rgba_img.Img, pos: *const types.Vec2u32, size: *const types.Vec2u32) BoundingBoxRectangleError!types.BoudingRectangleu32 {
+pub fn compute_bounding_rectangle(
+    img: *rgba_img.Img,
+    pos: *const types.Vec2u32,
+    size: *const types.Vec2u32,
+) BoundingBoxRectangleError!types.BoudingRectangleu32 {
     const half_width: u32 = size.x / 2;
     const half_height: u32 = size.y / 2;
 
@@ -57,7 +61,12 @@ pub fn compute_bounding_rectangle(img: *rgba_img.Img, pos: *const types.Vec2u32,
     };
 }
 
-pub fn draw_rectangle(img: *rgba_img.Img, pos: *const types.Vec2u32, size: *const types.Vec2u32, color: *const types.Color) !void {
+pub fn draw_rectangle(
+    img: *rgba_img.Img,
+    pos: *const types.Vec2u32,
+    size: *const types.Vec2u32,
+    color: *const types.Color,
+) void {
     var bounding_rec = compute_bounding_rectangle(img, pos, size) catch |err| {
         if (err == BoundingBoxRectangleError.OutOfImage) {
             return;
@@ -75,6 +84,47 @@ pub fn draw_rectangle(img: *rgba_img.Img, pos: *const types.Vec2u32, size: *cons
             img.r[_x][_y] = color.r;
             img.g[_x][_y] = color.g;
             img.b[_x][_y] = color.b;
+        }
+    }
+}
+
+pub fn draw_circle(
+    img: *rgba_img.Img,
+    pos: *const types.Vec2u32,
+    radius: u32,
+    color: *const types.Color,
+) !void {
+    const size = types.Vec2u32{
+        .x = radius * 2,
+        .y = radius * 2,
+    };
+
+    var bounding_rec = compute_bounding_rectangle(img, pos, &size) catch |err| {
+        if (err == BoundingBoxRectangleError.OutOfImage) {
+            return;
+        } else {
+            unreachable;
+        }
+    };
+
+    var _x: u32 = bounding_rec.x_min;
+    var _y: u32 = bounding_rec.y_min;
+
+    const radius_square: u64 = radius * radius;
+
+    while (_x <= bounding_rec.x_max) : (_x += 1) {
+        _y = bounding_rec.y_min;
+        while (_y <= bounding_rec.y_max) : (_y += 1) {
+            // circle equation : (_x - pos.x)^2 + (_y - pos.y)^2 < radisu^2
+            var x_square: i64 = @as(i64, _x) - @as(i64, pos.x);
+            x_square = x_square * x_square;
+            var y_square: i64 = @as(i64, _y) - @as(i64, pos.y);
+            y_square = y_square * y_square;
+            if (x_square + y_square < radius_square) {
+                img.r[_x][_y] = color.r;
+                img.g[_x][_y] = color.g;
+                img.b[_x][_y] = color.b;
+            }
         }
     }
 }
@@ -190,8 +240,8 @@ test "draw_rectange_at_center_check_colors" {
         .y = 2,
     };
 
-    try draw_rectangle(img, &pos, &size, &color);
-    try rgba_img.image_prompt_to_console(img);
+    draw_rectangle(img, &pos, &size, &color);
+    // try rgba_img.image_prompt_to_console(img);
 
     // checking red.
     try std.testing.expectEqual(img.r[0][0], 0);
@@ -255,4 +305,22 @@ test "draw_rectange_at_center_check_colors" {
     try std.testing.expectEqual(img.b[3][1], 0);
     try std.testing.expectEqual(img.b[3][2], 0);
     try std.testing.expectEqual(img.b[3][3], 0);
+}
+
+test "draw_circle_at_center" {
+    var img = try rgba_img.image_create(50, 50);
+
+    const color = types.Color{
+        .r = 15,
+        .g = 30,
+        .b = 255,
+    };
+
+    const pos = types.Vec2u32{
+        .x = 25,
+        .y = 25,
+    };
+    const center = 22;
+    try draw_circle(img, &pos, center, &color);
+    // try rgba_img.image_prompt_to_console(img);
 }
