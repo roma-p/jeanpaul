@@ -4,12 +4,12 @@ const types = @import("types.zig");
 const rgba_img = @import("rgba_img.zig");
 const stdout = std.io.getStdOut().writer();
 
-fn min(x: u32, y: u32) u32 {
+fn min(x: u16, y: u16) u16 {
     if (x < y) return x;
     return y;
 }
 
-fn max(x: u32, y: u32) u32 {
+fn max(x: u16, y: u16) u16 {
     if (x > y) return x;
     return y;
 }
@@ -21,8 +21,8 @@ pub fn compute_bounding_rectangle(
     pos: *const types.Vec2u32,
     size: *const types.Vec2u32,
 ) BoundingBoxRectangleError!types.BoudingRectangleu32 {
-    const half_width: u32 = size.x / 2;
-    const half_height: u32 = size.y / 2;
+    const half_width: u16 = size.x / 2;
+    const half_height: u16 = size.y / 2;
 
     // check if rectangle outside of image. (so not iterate)
     // no need to check if outside in negative side as pos can't be neg.
@@ -33,10 +33,10 @@ pub fn compute_bounding_rectangle(
         return BoundingBoxRectangleError.OutOfImage;
     }
 
-    const origin: u32 = 0;
+    const origin: u16 = 0;
 
-    var min_x: u32 = undefined;
-    var min_y: u32 = undefined;
+    var min_x: u16 = undefined;
+    var min_y: u16 = undefined;
 
     if (half_width > pos.x) {
         min_x = origin;
@@ -50,8 +50,8 @@ pub fn compute_bounding_rectangle(
         min_y = pos.y - half_height;
     }
 
-    const max_x: u32 = min(img.width - 1, pos.x + half_width - 1);
-    const max_y: u32 = min(img.height - 1, pos.y + half_height - 1);
+    const max_x: u16 = min(img.width - 1, pos.x + half_width - 1);
+    const max_y: u16 = min(img.height - 1, pos.y + half_height - 1);
 
     return types.BoudingRectangleu32{
         .x_min = min_x,
@@ -75,8 +75,8 @@ pub fn draw_rectangle(
         }
     };
 
-    var _x: u32 = bounding_rec.x_min;
-    var _y: u32 = bounding_rec.y_min;
+    var _x: u16 = bounding_rec.x_min;
+    var _y: u16 = bounding_rec.y_min;
 
     while (_x <= bounding_rec.x_max) : (_x += 1) {
         _y = bounding_rec.y_min;
@@ -107,18 +107,18 @@ pub fn draw_circle(
         }
     };
 
-    var _x: u32 = bounding_rec.x_min;
-    var _y: u32 = bounding_rec.y_min;
+    var _x: u16 = bounding_rec.x_min;
+    var _y: u16 = bounding_rec.y_min;
 
-    const radius_square: u64 = radius * radius;
+    const radius_square: u32 = radius * radius;
 
     while (_x <= bounding_rec.x_max) : (_x += 1) {
         _y = bounding_rec.y_min;
         while (_y <= bounding_rec.y_max) : (_y += 1) {
             // circle equation : (_x - pos.x)^2 + (_y - pos.y)^2 < radisu^2
-            var x_square: i64 = @as(i64, _x) - @as(i64, pos.x);
+            var x_square: i32 = @as(i32, _x) - @as(i32, pos.x);
             x_square = x_square * x_square;
-            var y_square: i64 = @as(i64, _y) - @as(i64, pos.y);
+            var y_square: i32 = @as(i32, _y) - @as(i32, pos.y);
             y_square = y_square * y_square;
             if (x_square + y_square < radius_square) {
                 img.r[_x][_y] = color.r;
@@ -317,10 +317,11 @@ test "draw_circle_at_center" {
     };
 
     const pos = types.Vec2u32{
-        .x = 25,
-        .y = 25,
+        .x = 30,
+        .y = 40,
     };
     const center = 22;
     try draw_circle(img, &pos, center, &color);
+    try rgba_img.image_write_to_ppm(img);
     // try rgba_img.image_prompt_to_console(img);
 }
