@@ -57,6 +57,7 @@ fn check_ray_intersect_with_sphere(
     sphere_position: types.Vec3f32,
     sphere_radius: f32,
     intersect_position: *types.Vec3f32,
+    intersect_ray_multiplier: *f32,
 ) !bool {
     // - equation of the ray is : ray_origin + t * ray_direction = P
     //   where t is a scalar and p a Vec3f32 position on the 3d space.
@@ -86,6 +87,7 @@ fn check_ray_intersect_with_sphere(
     }
 
     intersect_position.* = ray_direction.product_scalar(t).sum_vector(&ray_origin);
+    intersect_ray_multiplier.* = t;
     return true;
 }
 
@@ -142,6 +144,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
     var radius: f32 = 10;
 
     var intersect_position: types.Vec3f32 = undefined;
+    var intersect_ray_multiplier: f32 = undefined;
 
     var ray_direction_1 = get_ray_direction(&camera, focal_center, 30, 30, 0, 0);
     const intersect_1 = try check_ray_intersect_with_sphere(
@@ -150,6 +153,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
         sphere_position,
         radius,
         &intersect_position,
+        &intersect_ray_multiplier,
     );
 
     try std.testing.expectEqual(intersect_1, false);
@@ -160,6 +164,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
         sphere_position,
         radius,
         &intersect_position,
+        &intersect_ray_multiplier,
     );
     try std.testing.expectEqual(intersect_2, true);
 
@@ -170,10 +175,12 @@ test "check_ray_intersect_with_sphere_basic_test" {
         sphere_position,
         radius,
         &intersect_position,
+        &intersect_ray_multiplier,
     );
     try std.testing.expectEqual(intersect_3, false);
 
     try std.testing.expectEqual(intersect_position.x, 0);
     try std.testing.expectEqual(intersect_position.y, 0);
     try std.testing.expectEqual(intersect_position.z, -10);
+    try std.testing.expectEqual(intersect_ray_multiplier, 1);
 }
