@@ -18,9 +18,9 @@ const BoundingBoxRectangleError = error{OutOfImage};
 
 pub fn compute_bounding_rectangle(
     img: *rgba_img.Img,
-    pos: *const types.Vec2u32,
-    size: *const types.Vec2u32,
-) BoundingBoxRectangleError!types.BoudingRectangleu32 {
+    pos: *const types.Vec2u16,
+    size: *const types.Vec2u16,
+) BoundingBoxRectangleError!types.BoudingRectangleu16 {
     const half_width: u16 = size.x / 2;
     const half_height: u16 = size.y / 2;
 
@@ -53,7 +53,7 @@ pub fn compute_bounding_rectangle(
     const max_x: u16 = min(img.width - 1, pos.x + half_width - 1);
     const max_y: u16 = min(img.height - 1, pos.y + half_height - 1);
 
-    return types.BoudingRectangleu32{
+    return types.BoudingRectangleu16{
         .x_min = min_x,
         .x_max = max_x,
         .y_min = min_y,
@@ -63,8 +63,8 @@ pub fn compute_bounding_rectangle(
 
 pub fn draw_rectangle(
     img: *rgba_img.Img,
-    pos: *const types.Vec2u32,
-    size: *const types.Vec2u32,
+    pos: *const types.Vec2u16,
+    size: *const types.Vec2u16,
     color: *const types.Color,
 ) void {
     var bounding_rec = compute_bounding_rectangle(img, pos, size) catch |err| {
@@ -90,11 +90,11 @@ pub fn draw_rectangle(
 
 pub fn draw_circle(
     img: *rgba_img.Img,
-    pos: *const types.Vec2u32,
-    radius: u32,
+    pos: *const types.Vec2u16,
+    radius: u16,
     color: *const types.Color,
 ) !void {
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = radius * 2,
         .y = radius * 2,
     };
@@ -133,12 +133,12 @@ pub fn draw_circle(
 
 test "compute_bounding_rectangle_at_center" {
     var img = try rgba_img.image_create(4, 4);
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
     };
 
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = 2,
         .y = 2,
     };
@@ -151,12 +151,12 @@ test "compute_bounding_rectangle_at_center" {
 
 test "compute_bounding_rectangle_at_center_size_of_image" {
     var img = try rgba_img.image_create(4, 4);
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
     };
 
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = 4,
         .y = 4,
     };
@@ -169,12 +169,12 @@ test "compute_bounding_rectangle_at_center_size_of_image" {
 
 test "compute_bounding_rectangle_at_center_larger_than_image" {
     var img = try rgba_img.image_create(4, 4);
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
     };
 
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = 6,
         .y = 10,
     };
@@ -187,12 +187,12 @@ test "compute_bounding_rectangle_at_center_larger_than_image" {
 
 test "compute_bounding_rectangle_larger_at_positive_angle" {
     var img = try rgba_img.image_create(4, 4);
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 3,
         .y = 3,
     };
 
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = 3,
         .y = 3,
     };
@@ -205,12 +205,12 @@ test "compute_bounding_rectangle_larger_at_positive_angle" {
 
 test "compute_bounding_rectangle_larger_at_negative_angle" {
     var img = try rgba_img.image_create(4, 4);
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 0,
         .y = 0,
     };
 
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = 4,
         .y = 4,
     };
@@ -230,12 +230,12 @@ test "draw_rectange_at_center_check_colors" {
         .b = 255,
     };
 
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
     };
 
-    const size = types.Vec2u32{
+    const size = types.Vec2u16{
         .x = 2,
         .y = 2,
     };
@@ -316,7 +316,7 @@ test "draw_circle_at_center" {
         .b = 255,
     };
 
-    const pos = types.Vec2u32{
+    const pos = types.Vec2u16{
         .x = 30,
         .y = 40,
     };
