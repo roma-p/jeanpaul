@@ -2,6 +2,13 @@ const std = @import("std");
 const stdout = std.io.getStdOut().writer();
 const allocator = std.heap.page_allocator;
 
+// axis used by the image are:
+//
+//  y
+//  ^
+//  |
+//  * -> x
+
 pub const Img = struct {
     width: u16 = undefined,
     height: u16 = undefined,
@@ -16,10 +23,10 @@ pub fn image_create(width: u8, height: u8) !*Img {
     img.* = Img{
         .width = width,
         .height = height,
-        .r = try matrix_create_2d_u8(height, width),
-        .g = try matrix_create_2d_u8(height, width),
-        .b = try matrix_create_2d_u8(height, width),
-        .a = try matrix_create_2d_u8(height, width),
+        .r = try matrix_create_2d_u8(width, height),
+        .g = try matrix_create_2d_u8(width, height),
+        .b = try matrix_create_2d_u8(width, height),
+        .a = try matrix_create_2d_u8(width, height),
     };
     return img;
 }
@@ -32,11 +39,19 @@ pub fn image_delete(img: *Img) !void {
     allocator.destroy(img);
 }
 
+// axis to print on console are.
+//
+//  * -> x
+//  |
+//  v y
 pub fn image_prompt_to_console(img: *Img) !void {
-    const red_values = img.r;
-    try stdout.print("\n", .{});
-    for (red_values) |row| {
-        for (row) |value| {
+    var _x: u16 = 0;
+    var _y: u16 = undefined;
+
+    while (_x < img.width) : (_x += 1) {
+        _y = img.height - 1;
+        while (_y != 0) : (_y -= 1) {
+            var value: u8 = img.r[_x][_y];
             var c: u8 = undefined;
             if (value == 0) {
                 c = '.';
@@ -49,6 +64,11 @@ pub fn image_prompt_to_console(img: *Img) !void {
     }
 }
 
+// axis on ppm are.
+//
+//  * -> x
+//  |
+//  v y
 pub fn image_write_to_ppm(img: *Img) !void {
     const file = try std.fs.cwd().createFile(
         "junk_file2.ppm",
@@ -65,11 +85,11 @@ pub fn image_write_to_ppm(img: *Img) !void {
     defer allocator.free(header);
 
     var _x: u16 = 0;
-    var _y: u16 = 0;
+    var _y: u16 = undefined;
 
     while (_x < img.width) : (_x += 1) {
-        _y = 0;
-        while (_y < img.height) : (_y += 1) {
+        _y = img.height - 1;
+        while (_y != 0) : (_y -= 1) {
             const line = try std.fmt.allocPrint(
                 allocator,
                 "\n{} {} {}",
@@ -120,7 +140,6 @@ test "image_create_and_delete" {
 test "image_write_to_ppm_basic" {
     var img = try image_create(3, 3);
     img.r[0][0] = 1;
-    try stdout.print("luul", .{});
     try image_write_to_ppm(img);
     try image_delete(img);
 }
