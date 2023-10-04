@@ -1,4 +1,8 @@
 
+
+- COLOR as single file.
+- Method to add object to scene: Scene.create() ? or Scene.add() generic?
+
 CORRECT IMG: func height / width forced at u8
 ADD DRAW PX HELPER IN IMG: X / Y / COLOR
 
