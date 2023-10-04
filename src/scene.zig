@@ -10,7 +10,9 @@ pub const Scene = struct {
     objects: std.ArrayList(*object_module.Object),
     // camera: std.ArrayList(*object_module.Object),
     pub fn add_object(self: *Scene, obj: *object_module.Object) !void {
-        if (obj.object_type != object_module.ObjectType.Implicit and obj.object_type != object_module.ObjectType.Mesh) {
+        if (obj.object_type != object_module.ObjectType.Implicit and
+            obj.object_type != object_module.ObjectType.Mesh)
+        {
             unreachable;
         }
         try self.objects.append(obj);
