@@ -1,5 +1,6 @@
 const std = @import("std");
 const types = @import("types.zig");
+const color_module = @import("color.zig");
 const stdout = std.io.getStdOut().writer();
 const allocator = std.heap.page_allocator;
 
@@ -106,7 +107,7 @@ pub fn image_write_to_ppm(img: *Img) !void {
     }
 }
 
-pub fn image_draw_at_px(img: *Img, x: u16, y: u16, color: *types.Color) !*Img {
+pub fn image_draw_at_px(img: *Img, x: u16, y: u16, color: *color_module.Color) !*Img {
     // TODO HANDLE ERROR OUT OF RANGE!
     img.r[x][y] = color.x;
     img.g[x][y] = color.x;

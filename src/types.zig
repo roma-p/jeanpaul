@@ -1,9 +1,3 @@
-pub const Color = struct {
-    r: u8 = undefined,
-    g: u8 = undefined,
-    b: u8 = undefined,
-};
-
 pub const Vec2u16 = struct {
     x: u16 = undefined,
     y: u16 = undefined,
