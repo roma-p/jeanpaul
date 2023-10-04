@@ -5,9 +5,12 @@ const allocator = std.heap.page_allocator;
 
 pub const Object = struct {
     tmatrix: types.TMatrixf32 = types.TMatrixf32{},
-    material: *material.Material = &material.DEFAULT_MATERIAL,
+    material: *material.Material = &material.MATERIAL_DEFAULT,
     shape: *Shape = undefined,
+    object_type: ObjectType,
 };
+
+pub const ObjectType = enum { Camera, Light, Mesh, Implicit };
 
 pub const Shape = union(enum) {
     Sphere: *ShapeSphere,
@@ -29,7 +32,7 @@ pub fn create_sphere() !*Object {
     var obj = try allocator.create(Object);
     var shape = try allocator.create(Shape);
     shape.* = Shape{ .Sphere = sphere };
-    obj.* = Object{ .shape = shape };
+    obj.* = Object{ .shape = shape, .object_type = ObjectType.Implicit };
     return obj;
 }
 
@@ -39,7 +42,7 @@ pub fn create_camera() !*Object {
     var obj = try allocator.create(Object);
     var shape = try allocator.create(Shape);
     shape.* = Shape{ .Camera = camera };
-    obj.* = Object{ .shape = shape };
+    obj.* = Object{ .shape = shape, .object_type = ObjectType.Camera };
     return obj;
 }
 
