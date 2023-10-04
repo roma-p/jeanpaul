@@ -1,5 +1,6 @@
 
-
+CORRECT IMG: func height / width forced at u8
+ADD DRAW PX HELPER IN IMG: X / Y / COLOR
 
 focal_center = get_focal_plane_center(camera)
 for px in image:

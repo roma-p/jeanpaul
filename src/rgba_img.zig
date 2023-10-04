@@ -1,4 +1,5 @@
 const std = @import("std");
+const types = @import("types.zig");
 const stdout = std.io.getStdOut().writer();
 const allocator = std.heap.page_allocator;
 
@@ -103,6 +104,15 @@ pub fn image_write_to_ppm(img: *Img) !void {
             defer allocator.free(line);
         }
     }
+}
+
+pub fn image_draw_at_px(img: *Img, x: u16, y: u16, color: *types.Color) !*Img {
+    // TODO HANDLE ERROR OUT OF RANGE!
+    img.r[x][y] = color.x;
+    img.g[x][y] = color.x;
+    img.b[x][y] = color.x;
+    img.a[x][y] = color.x;
+    return img;
 }
 
 fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
