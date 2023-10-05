@@ -1,9 +1,3 @@
-pub const Color = struct {
-    r: u8 = undefined,
-    g: u8 = undefined,
-    b: u8 = undefined,
-};
-
 pub const Vec2u16 = struct {
     x: u16 = undefined,
     y: u16 = undefined,
@@ -48,6 +42,34 @@ pub const BoudingRectangleu16 = struct {
     x_max: u16 = undefined,
     y_min: u16 = undefined,
     y_max: u16 = undefined,
+};
+
+pub const TMatrixf32 = struct {
+    m: [4][4]f32 = TRANSFORM_MATRIX_IDENTITY,
+
+    pub fn set_position(
+        self: *TMatrixf32,
+        position: *const Vec3f32,
+    ) !void {
+        self.m.*[0][3] = position.x;
+        self.m.*[1][3] = position.y;
+        self.m.*[2][3] = position.z;
+    }
+
+    pub fn get_position(self: *TMatrixf32) Vec3f32 {
+        return Vec3f32{
+            .x = self.m[0][3],
+            .y = self.m[1][3],
+            .z = self.m[2][3],
+        };
+    }
+};
+
+const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
+    [_]f32{ 1, 0, 0, 0 },
+    [_]f32{ 0, 1, 0, 0 },
+    [_]f32{ 0, 0, 1, 0 },
+    [_]f32{ 0, 0, 0, 1 },
 };
 
 pub fn cast_u16_to_f32(input: u16) f32 {

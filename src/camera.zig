@@ -1,5 +1,6 @@
 const std = @import("std");
 const types = @import("types.zig");
+const rgba_img = @import("rgba_img.zig");
 const allocator = std.heap.page_allocator;
 const stdout = std.io.getStdOut().writer();
 const math_utils = @import("math_utils.zig");
@@ -12,6 +13,11 @@ pub const Camera = struct {
         .y = 0,
         .z = 1,
     },
+    color: types.Color = Color {
+        255,
+        255,
+        255,
+    }
 };
 
 fn get_ray_direction(
@@ -57,6 +63,7 @@ fn check_ray_intersect_with_sphere(
     sphere_position: types.Vec3f32,
     sphere_radius: f32,
     intersect_position: *types.Vec3f32,
+    intersect_ray_multiplier: *f32,
 ) !bool {
     // - equation of the ray is : ray_origin + t * ray_direction = P
     //   where t is a scalar and p a Vec3f32 position on the 3d space.
@@ -86,7 +93,58 @@ fn check_ray_intersect_with_sphere(
     }
 
     intersect_position.* = ray_direction.product_scalar(t).sum_vector(&ray_origin);
+    intersect_ray_multiplier.* = t;
     return true;
+}
+
+fn draw_image(
+        img: *rgba_img.Img,
+        camera: *Camera,
+        obj_list: ...): void {
+
+    const focal_center = get_focal_plane_center(camera);
+    const img_width = img*.width;
+    const img_height = img*.height;
+    const camera_position = camera.position;
+
+    var _x: u16 = 0;
+    var _y: u16 = undefined;
+
+    var _ray_direction: types.Vec3f32 = undefined;
+    var _t_current: f32 = undefined;
+    var _t_min: f32 = undefined;
+    var _intersect_position: types.Vec3f32 = undefined;
+    var _intersect_object: Sphere = undefined;
+    while (_x < img.width) : (_x += 1) {
+        _y = img.height - 1;
+        while (_y != 0) : (_y -= 1) {
+            _ray_direction = get_ray_direction(
+                camera, focal_center,
+                img_width, img_height, _x, _y,
+            );
+            for (obj_list) |obj| {
+                const does_intersect = try check_ray_intersect_with_sphere(
+                    ray_direction,
+                    camera_position,
+                    obj.position,
+                    obj.radius,
+                    &_intersect_position,
+                    &_t_current,
+                );
+                if (does_intersect == false) {
+                    continue;
+                }
+                if (_t_min == 0 or _t_current < _t_min) {
+                    _intersect_object = obj;
+                    _t_min = _t_current;
+                }
+            }
+            if (_intersect_object == undefined) {
+                continue
+            }
+            image_draw_at_px(img, _x, _y, obj.color);
+        }
+    }
 }
 
 test "get_focal_plane_center_on_valid_case" {
@@ -142,6 +200,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
     var radius: f32 = 10;
 
     var intersect_position: types.Vec3f32 = undefined;
+    var intersect_ray_multiplier: f32 = undefined;
 
     var ray_direction_1 = get_ray_direction(&camera, focal_center, 30, 30, 0, 0);
     const intersect_1 = try check_ray_intersect_with_sphere(
@@ -150,6 +209,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
         sphere_position,
         radius,
         &intersect_position,
+        &intersect_ray_multiplier,
     );
 
     try std.testing.expectEqual(intersect_1, false);
@@ -160,6 +220,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
         sphere_position,
         radius,
         &intersect_position,
+        &intersect_ray_multiplier,
     );
     try std.testing.expectEqual(intersect_2, true);
 
@@ -170,10 +231,12 @@ test "check_ray_intersect_with_sphere_basic_test" {
         sphere_position,
         radius,
         &intersect_position,
+        &intersect_ray_multiplier,
     );
     try std.testing.expectEqual(intersect_3, false);
 
     try std.testing.expectEqual(intersect_position.x, 0);
     try std.testing.expectEqual(intersect_position.y, 0);
     try std.testing.expectEqual(intersect_position.z, -10);
+    try std.testing.expectEqual(intersect_ray_multiplier, 1);
 }

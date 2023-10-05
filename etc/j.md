@@ -1,3 +1,24 @@
+
+
+- COLOR as single file.
+- Method to add object to scene: Scene.create() ? or Scene.add() generic?
+
+CORRECT IMG: func height / width forced at u8
+ADD DRAW PX HELPER IN IMG: X / Y / COLOR
+
+focal_center = get_focal_plane_center(camera)
+for px in image:
+  direction = get_direction(camera, focal_center, px)
+  vec position;
+  int distance
+  int disrance_min 
+  for obj in obj_list:
+    if ray_intersect():
+      if distance > distance_min...
+
+
+
+
 - matrice: 
   - obj
     - [ ] model: decris position dans l'espace. from espace obj -> espace du monde
@@ -10,6 +31,3 @@
 - [ ] missing defer...
 - [ ] draw a cube of any size on an image (before circle...)
 - [ ] add things to draw on the terminal to start.
-
-
-
