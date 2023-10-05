@@ -8,6 +8,7 @@ pub const Vec3f32 = struct {
     y: f32 = undefined,
     z: f32 = undefined,
 
+    // TODO: rename scale anrold: "atVectorAPI"
     pub fn product_scalar(self: *const Vec3f32, x: f32) Vec3f32 {
         return Vec3f32{
             .x = x * self.x,

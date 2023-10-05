@@ -9,6 +9,11 @@ const scene_module = @import("scene.zig");
 const object_module = @import("object.zig");
 const material_module = @import("material.zig");
 
+// POUR LE MOMENT: implicit: 1px: "1" dans l'espace 3D.
+// ALORS QUE: definir taille (fix) du plan focal
+// induire la taille des PX de l'image en fonction du plan focal.
+// iterer dessus.
+
 fn get_ray_direction(
     camera: *const object_module.Object,
     focal_plane_center: types.Vec3f32,
@@ -95,13 +100,12 @@ pub fn render(
     scene: *scene_module.Scene,
 ) !void {
     const focal_center = get_focal_plane_center(camera);
+    const camera_position = camera.tmatrix.get_position();
 
     const img_width = img.*.width;
     const img_height = img.*.height;
     var _x: u16 = 0;
     var _y: u16 = undefined;
-
-    const camera_position = camera.tmatrix.get_position();
 
     var _ray_direction: types.Vec3f32 = undefined;
 
