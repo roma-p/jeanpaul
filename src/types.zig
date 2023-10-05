@@ -51,17 +51,34 @@ pub const TMatrixf32 = struct {
         self: *TMatrixf32,
         position: *const Vec3f32,
     ) !void {
-        self.m.*[0][3] = position.x;
-        self.m.*[1][3] = position.y;
-        self.m.*[2][3] = position.z;
+        self.m[0][3] = position.x;
+        self.m[1][3] = position.y;
+        self.m[2][3] = position.z;
     }
 
-    pub fn get_position(self: *TMatrixf32) Vec3f32 {
+    pub fn get_position(self: *const TMatrixf32) Vec3f32 {
         return Vec3f32{
             .x = self.m[0][3],
             .y = self.m[1][3],
             .z = self.m[2][3],
         };
+    }
+
+    pub fn set_tmatrix(self: *const TMatrixf32, matrix: *[4][4]f32) void {
+        for (matrix, 0..) |_, x| {
+            for (matrix[x], 0..) |value, y| {
+                self.m[x][y] = value;
+            }
+        }
+    }
+
+    pub fn translate(
+        self: *const TMatrixf32,
+        position: *Vec3f32,
+    ) void {
+        self.m[0][3] += position.x;
+        self.m[1][3] += position.y;
+        self.m[2][3] += position.z;
     }
 };
 

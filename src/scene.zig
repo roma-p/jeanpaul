@@ -22,7 +22,10 @@ pub const Scene = struct {
 pub fn create_scene() !*Scene {
     var scene = try allocator.create(Scene);
     scene.* = Scene{
-        .objects = try std.ArrayList(*object_module.Object).initCapacity(allocator, 10),
+        .objects = try std.ArrayList(*object_module.Object).initCapacity(
+            allocator,
+            10,
+        ),
     };
     return scene;
 }

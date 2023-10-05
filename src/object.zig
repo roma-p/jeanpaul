@@ -4,7 +4,7 @@ const material = @import("material.zig");
 const allocator = std.heap.page_allocator;
 
 pub const Object = struct {
-    tmatrix: types.TMatrixf32 = types.TMatrixf32{},
+    tmatrix: *types.TMatrixf32 = undefined,
     material: *material.Material = &material.MATERIAL_DEFAULT,
     shape: *Shape = undefined,
     object_type: ObjectType,
@@ -18,11 +18,11 @@ pub const Shape = union(enum) {
 };
 
 pub const ShapeSphere = struct {
-    radius: u32 = 10,
+    radius: f32 = 10,
 };
 
 pub const ShapeCamera = struct {
-    focal_length: u32 = 10,
+    focal_length: f32 = 10,
     direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
 };
 
@@ -32,7 +32,12 @@ pub fn create_sphere() !*Object {
     var obj = try allocator.create(Object);
     var shape = try allocator.create(Shape);
     shape.* = Shape{ .Sphere = sphere };
-    obj.* = Object{ .shape = shape, .object_type = ObjectType.Implicit };
+    var tmatrix = try create_t_matrix();
+    obj.* = Object{
+        .shape = shape,
+        .object_type = ObjectType.Implicit,
+        .tmatrix = tmatrix,
+    };
     return obj;
 }
 
@@ -42,7 +47,12 @@ pub fn create_camera() !*Object {
     var obj = try allocator.create(Object);
     var shape = try allocator.create(Shape);
     shape.* = Shape{ .Camera = camera };
-    obj.* = Object{ .shape = shape, .object_type = ObjectType.Camera };
+    var tmatrix = try create_t_matrix();
+    obj.* = Object{
+        .shape = shape,
+        .object_type = ObjectType.Camera,
+        .tmatrix = tmatrix,
+    };
     return obj;
 }
 
@@ -51,8 +61,22 @@ pub fn delete_obj(obj: *Object) void {
         .Camera => allocator.destroy(obj.shape.Camera),
         .Sphere => allocator.destroy(obj.shape.Sphere),
     }
+    allocator.destroy(obj.tmatrix);
     allocator.destroy(obj.shape);
     allocator.destroy(obj);
+}
+
+pub fn create_t_matrix() !*types.TMatrixf32 {
+    var m = try allocator.create([4][4]f32);
+    m.* = [_][4]f32{
+        [_]f32{ 1, 0, 0, 0 },
+        [_]f32{ 0, 1, 0, 0 },
+        [_]f32{ 0, 0, 1, 0 },
+        [_]f32{ 0, 0, 0, 1 },
+    };
+    var tmatrix = try allocator.create(types.TMatrixf32);
+    tmatrix.* = types.TMatrixf32{ .m = m.* };
+    return tmatrix;
 }
 
 test "create_camera" {

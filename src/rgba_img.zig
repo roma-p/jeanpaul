@@ -71,9 +71,9 @@ pub fn image_prompt_to_console(img: *Img) !void {
 //  * -> x
 //  |
 //  v y
-pub fn image_write_to_ppm(img: *Img) !void {
+pub fn image_write_to_ppm(img: *Img, filename: []const u8) !void {
     const file = try std.fs.cwd().createFile(
-        "junk_file2.ppm",
+        filename,
         .{ .read = true },
     );
     defer file.close();
@@ -90,15 +90,15 @@ pub fn image_write_to_ppm(img: *Img) !void {
     var _y: u16 = undefined;
 
     while (_x < img.width) : (_x += 1) {
-        _y = img.height - 1;
-        while (_y != 0) : (_y -= 1) {
+        _y = img.height;
+        while (_y > 0) : (_y -= 1) {
             const line = try std.fmt.allocPrint(
                 allocator,
                 "\n{} {} {}",
                 .{
-                    img.r[_x][_y],
-                    img.g[_x][_y],
-                    img.b[_x][_y],
+                    img.r[_x][_y - 1],
+                    img.g[_x][_y - 1],
+                    img.b[_x][_y - 1],
                 },
             );
             try file.writeAll(line);
@@ -107,13 +107,11 @@ pub fn image_write_to_ppm(img: *Img) !void {
     }
 }
 
-pub fn image_draw_at_px(img: *Img, x: u16, y: u16, color: *color_module.Color) !*Img {
+pub fn image_draw_at_px(img: *Img, x: u16, y: u16, color: color_module.Color) !void {
     // TODO HANDLE ERROR OUT OF RANGE!
-    img.r[x][y] = color.x;
-    img.g[x][y] = color.x;
-    img.b[x][y] = color.x;
-    img.a[x][y] = color.x;
-    return img;
+    img.r[x][y] = color.r;
+    img.g[x][y] = color.g;
+    img.b[x][y] = color.b;
 }
 
 fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
@@ -151,6 +149,6 @@ test "image_create_and_delete" {
 test "image_write_to_ppm_basic" {
     var img = try image_create(3, 3);
     img.r[0][0] = 1;
-    try image_write_to_ppm(img);
+    try image_write_to_ppm(img, "image_write_to_ppm_basic.ppm");
     try image_delete(img);
 }

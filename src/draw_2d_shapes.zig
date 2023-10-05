@@ -1,6 +1,7 @@
 const std = @import("std");
 const math = std.math;
 const types = @import("types.zig");
+const color_module = @import("color.zig");
 const rgba_img = @import("rgba_img.zig");
 const stdout = std.io.getStdOut().writer();
 
@@ -65,7 +66,7 @@ pub fn draw_rectangle(
     img: *rgba_img.Img,
     pos: *const types.Vec2u16,
     size: *const types.Vec2u16,
-    color: *const types.Color,
+    color: *const color_module.Color,
 ) void {
     var bounding_rec = compute_bounding_rectangle(img, pos, size) catch |err| {
         if (err == BoundingBoxRectangleError.OutOfImage) {
@@ -92,7 +93,7 @@ pub fn draw_circle(
     img: *rgba_img.Img,
     pos: *const types.Vec2u16,
     radius: u16,
-    color: *const types.Color,
+    color: *const color_module.Color,
 ) !void {
     const size = types.Vec2u16{
         .x = radius * 2,
@@ -224,7 +225,7 @@ test "compute_bounding_rectangle_larger_at_negative_angle" {
 test "draw_rectange_at_center_check_colors" {
     var img = try rgba_img.image_create(4, 4);
 
-    const color = types.Color{
+    const color = color_module.Color{
         .r = 15,
         .g = 30,
         .b = 255,
@@ -310,7 +311,7 @@ test "draw_rectange_at_center_check_colors" {
 test "draw_circle_at_center" {
     var img = try rgba_img.image_create(50, 50);
 
-    const color = types.Color{
+    const color = color_module.Color{
         .r = 15,
         .g = 30,
         .b = 255,
@@ -322,6 +323,5 @@ test "draw_circle_at_center" {
     };
     const center = 22;
     try draw_circle(img, &pos, center, &color);
-    try rgba_img.image_write_to_ppm(img);
-    // try rgba_img.image_prompt_to_console(img);
+    try rgba_img.image_write_to_ppm(img, "draw_circle_at_center.ppm");
 }
