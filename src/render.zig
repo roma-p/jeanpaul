@@ -303,7 +303,7 @@ test "render_two_sphere_at_center" {
     try sphere_2.tmatrix.set_position(&types.Vec3f32{
         .x = 5,
         .y = 5,
-        .z = 5,
+        .z = -2,
     });
 
     var scene = try scene_module.create_scene();
@@ -313,35 +313,3 @@ test "render_two_sphere_at_center" {
     try render(img, camera, scene);
     try rgba_img.image_write_to_ppm(img, "render_two_sphere_at_center.ppm");
 }
-
-// test "render_two_sphere" {
-//     const camera = try object_module.create_camera();
-//     camera.shape.Camera.focal_length = 10;
-//     try camera.tmatrix.set_position(&types.Vec3f32{
-//         .x = 0,
-//         .y = 0,
-//         .z = -20,
-//     });
-//
-//     const sphere_1 = try object_module.create_sphere();
-//     sphere_1.shape.Sphere.radius = 8;
-//     sphere_1.material = &material_module.MATERIAL_BASE_RED;
-//
-//     const sphere_2 = try object_module.create_sphere();
-//     try camera.tmatrix.set_position(&types.Vec3f32{
-//         .x = 0,
-//         .y = 0,
-//         .z = 0,
-//     });
-//     sphere_2.shape.Sphere.radius = 5;
-//     sphere_2.material = &material_module.MATERIAL_BASE_BLUE;
-//
-//     var scene = try scene_module.create_scene();
-//     try scene.add_object(sphere_1);
-//     // try scene.add_object(sphere_2);
-//
-//     var img = try rgba_img.image_create(64, 64);
-//
-//     try render(img, camera, scene);
-//     try rgba_img.image_write_to_ppm(img, "render_two_sphere.ppm");
-// }
