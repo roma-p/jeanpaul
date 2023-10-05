@@ -1,62 +1,62 @@
 const std = @import("std");
 const types = @import("types.zig");
-const material = @import("material.zig");
+const jp_material = @import("jp_material.zig");
 const allocator = std.heap.page_allocator;
 
-pub const Object = struct {
+pub const JpObject = struct {
     tmatrix: *types.TMatrixf32 = undefined,
-    material: *material.Material = &material.MATERIAL_DEFAULT,
+    material: *jp_material.JpMaterial = &jp_material.JP_MATERIAL_DEFAULT,
     shape: *Shape = undefined,
-    object_type: ObjectType,
+    object_type: JpObjectType,
 };
 
-pub const ObjectType = enum { Camera, Light, Mesh, Implicit };
+pub const JpObjectType = enum { Camera, Light, Mesh, Implicit };
 
 pub const Shape = union(enum) {
     Sphere: *ShapeSphere,
     Camera: *ShapeCamera,
 };
 
-pub const ShapeSphere = struct {
+const ShapeSphere = struct {
     radius: f32 = 10,
 };
 
-pub const ShapeCamera = struct {
+const ShapeCamera = struct {
     focal_length: f32 = 10,
     direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
 };
 
-pub fn create_sphere() !*Object {
+pub fn create_sphere() !*JpObject {
     var sphere = try allocator.create(ShapeSphere);
     sphere.* = ShapeSphere{};
-    var obj = try allocator.create(Object);
+    var obj = try allocator.create(JpObject);
     var shape = try allocator.create(Shape);
     shape.* = Shape{ .Sphere = sphere };
     var tmatrix = try create_t_matrix();
-    obj.* = Object{
+    obj.* = JpObject{
         .shape = shape,
-        .object_type = ObjectType.Implicit,
+        .object_type = JpObjectType.Implicit,
         .tmatrix = tmatrix,
     };
     return obj;
 }
 
-pub fn create_camera() !*Object {
+pub fn create_camera() !*JpObject {
     var camera = try allocator.create(ShapeCamera);
     camera.* = ShapeCamera{};
-    var obj = try allocator.create(Object);
+    var obj = try allocator.create(JpObject);
     var shape = try allocator.create(Shape);
     shape.* = Shape{ .Camera = camera };
     var tmatrix = try create_t_matrix();
-    obj.* = Object{
+    obj.* = JpObject{
         .shape = shape,
-        .object_type = ObjectType.Camera,
+        .object_type = JpObjectType.Camera,
         .tmatrix = tmatrix,
     };
     return obj;
 }
 
-pub fn delete_obj(obj: *Object) void {
+pub fn delete_obj(obj: *JpObject) void {
     switch (obj.shape.*) {
         .Camera => allocator.destroy(obj.shape.Camera),
         .Sphere => allocator.destroy(obj.shape.Sphere),

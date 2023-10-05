@@ -3,19 +3,21 @@ const allocator = std.heap.page_allocator;
 const stdout = std.io.getStdOut().writer();
 
 const types = @import("types.zig");
-const rgba_img = @import("rgba_img.zig");
 const math_utils = @import("math_utils.zig");
-const scene_module = @import("scene.zig");
-const object_module = @import("object.zig");
-const material_module = @import("material.zig");
+const jp_img = @import("jp_img.zig");
+const jp_scene = @import("jp_scene.zig");
+const jp_object = @import("jp_object.zig");
+const jp_material = @import("jp_material.zig");
 
 // POUR LE MOMENT: implicit: 1px: "1" dans l'espace 3D.
 // ALORS QUE: definir taille (fix) du plan focal
 // induire la taille des PX de l'image en fonction du plan focal.
 // iterer dessus.
 
+// tirer rayon au MILIEU DU PIXEL !
+
 fn get_ray_direction(
-    camera: *const object_module.Object,
+    camera: *const jp_object.JpObject,
     focal_plane_center: types.Vec3f32,
     screen_width: u16,
     screen_height: u16,
@@ -45,7 +47,7 @@ fn get_ray_direction(
     return ray_direction;
 }
 
-fn get_focal_plane_center(camera: *const object_module.Object) types.Vec3f32 {
+fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
     // camera.pos + camera.direction * focal_length
     var weighted_direction = camera.shape.Camera.direction.product_scalar(
         camera.shape.Camera.focal_length,
@@ -95,9 +97,9 @@ fn check_ray_intersect_with_sphere(
 }
 
 pub fn render(
-    img: *rgba_img.Img,
-    camera: *object_module.Object,
-    scene: *scene_module.Scene,
+    img: *jp_img.JpImg,
+    camera: *jp_object.JpObject,
+    scene: *jp_scene.JpScene,
 ) !void {
     const focal_center = get_focal_plane_center(camera);
     const camera_position = camera.tmatrix.get_position();
@@ -114,7 +116,7 @@ pub fn render(
 
     var _intersect_one_obj: bool = undefined;
     var _intersect_position: types.Vec3f32 = undefined;
-    var _intersect_object: object_module.Object = undefined;
+    var _intersect_object: jp_object.JpObject = undefined;
 
     while (_x < img.width) : (_x += 1) {
         _y = img.height - 1;
@@ -130,7 +132,7 @@ pub fn render(
             _intersect_one_obj = false;
             _t_min = 0;
             for (scene.objects.items) |obj| {
-                if (obj.object_type == object_module.ObjectType.Mesh) {
+                if (obj.object_type == jp_object.JpObjectType.Mesh) {
                     unreachable;
                 }
                 var does_intersect: bool = undefined;
@@ -162,7 +164,7 @@ pub fn render(
             if (_intersect_one_obj == false) {
                 continue;
             }
-            try rgba_img.image_draw_at_px(
+            try jp_img.image_draw_at_px(
                 img,
                 _x,
                 _y,
@@ -173,7 +175,7 @@ pub fn render(
 }
 
 test "get_focal_plane_center_on_valid_case" {
-    var camera = try object_module.create_camera();
+    var camera = try jp_object.create_camera();
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -188,7 +190,7 @@ test "get_focal_plane_center_on_valid_case" {
 }
 
 test "get_ray_direction_on_valid_case" {
-    const camera = try object_module.create_camera();
+    const camera = try jp_object.create_camera();
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -209,7 +211,7 @@ test "get_ray_direction_on_valid_case" {
 }
 
 test "check_ray_intersect_with_sphere_basic_test" {
-    const camera = try object_module.create_camera();
+    const camera = try jp_object.create_camera();
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -264,7 +266,7 @@ test "check_ray_intersect_with_sphere_basic_test" {
 }
 
 test "render_one_sphere_at_center" {
-    const camera = try object_module.create_camera();
+    const camera = try jp_object.create_camera();
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -272,21 +274,21 @@ test "render_one_sphere_at_center" {
         .z = -20,
     });
 
-    var img = try rgba_img.image_create(30, 30);
+    var img = try jp_img.image_create(30, 30);
 
-    const sphere_1 = try object_module.create_sphere();
+    const sphere_1 = try jp_object.create_sphere();
     sphere_1.shape.Sphere.radius = 8;
-    sphere_1.material = &material_module.MATERIAL_BASE_RED;
+    sphere_1.material = &jp_material.JP_MATERIAL_BASE_RED;
 
-    var scene = try scene_module.create_scene();
+    var scene = try jp_scene.create_scene();
     try scene.add_object(sphere_1);
 
     try render(img, camera, scene);
-    try rgba_img.image_write_to_ppm(img, "render_one_sphere_at_center.ppm");
+    try jp_img.image_write_to_ppm(img, "render_one_sphere_at_center.ppm");
 }
 
 test "render_two_sphere_at_center" {
-    const camera = try object_module.create_camera();
+    const camera = try jp_object.create_camera();
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -294,15 +296,15 @@ test "render_two_sphere_at_center" {
         .z = -20,
     });
 
-    var img = try rgba_img.image_create(30, 30);
+    var img = try jp_img.image_create(30, 30);
 
-    const sphere_1 = try object_module.create_sphere();
+    const sphere_1 = try jp_object.create_sphere();
     sphere_1.shape.Sphere.radius = 7;
-    sphere_1.material = &material_module.MATERIAL_BASE_RED;
+    sphere_1.material = &jp_material.JP_MATERIAL_BASE_RED;
 
-    const sphere_2 = try object_module.create_sphere();
+    const sphere_2 = try jp_object.create_sphere();
     sphere_2.shape.Sphere.radius = 8;
-    sphere_2.material = &material_module.MATERIAL_BASE_BLUE;
+    sphere_2.material = &jp_material.JP_MATERIAL_BASE_BLUE;
 
     try sphere_2.tmatrix.set_position(&types.Vec3f32{
         .x = 5,
@@ -310,10 +312,10 @@ test "render_two_sphere_at_center" {
         .z = -2,
     });
 
-    var scene = try scene_module.create_scene();
+    var scene = try jp_scene.create_scene();
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
 
     try render(img, camera, scene);
-    try rgba_img.image_write_to_ppm(img, "render_two_sphere_at_center.ppm");
+    try jp_img.image_write_to_ppm(img, "render_two_sphere_at_center.ppm");
 }

@@ -1,9 +1,9 @@
 const std = @import("std");
+const stdout = std.io.getStdOut().writer();
 const math = std.math;
 const types = @import("types.zig");
-const color_module = @import("color.zig");
-const rgba_img = @import("rgba_img.zig");
-const stdout = std.io.getStdOut().writer();
+const jp_color = @import("jp_color.zig");
+const jp_img = @import("jp_img.zig");
 
 fn min(x: u16, y: u16) u16 {
     if (x < y) return x;
@@ -18,7 +18,7 @@ fn max(x: u16, y: u16) u16 {
 const BoundingBoxRectangleError = error{OutOfImage};
 
 pub fn compute_bounding_rectangle(
-    img: *rgba_img.Img,
+    img: *jp_img.JpImg,
     pos: *const types.Vec2u16,
     size: *const types.Vec2u16,
 ) BoundingBoxRectangleError!types.BoudingRectangleu16 {
@@ -63,10 +63,10 @@ pub fn compute_bounding_rectangle(
 }
 
 pub fn draw_rectangle(
-    img: *rgba_img.Img,
+    img: *jp_img.JpImg,
     pos: *const types.Vec2u16,
     size: *const types.Vec2u16,
-    color: *const color_module.Color,
+    color: *const jp_color.JpColor,
 ) void {
     var bounding_rec = compute_bounding_rectangle(img, pos, size) catch |err| {
         if (err == BoundingBoxRectangleError.OutOfImage) {
@@ -90,10 +90,10 @@ pub fn draw_rectangle(
 }
 
 pub fn draw_circle(
-    img: *rgba_img.Img,
+    img: *jp_img.JpImg,
     pos: *const types.Vec2u16,
     radius: u16,
-    color: *const color_module.Color,
+    color: *const jp_color.JpColor,
 ) !void {
     const size = types.Vec2u16{
         .x = radius * 2,
@@ -133,7 +133,7 @@ pub fn draw_circle(
 // TESTS ----------------------------------------------------------------------
 
 test "compute_bounding_rectangle_at_center" {
-    var img = try rgba_img.image_create(4, 4);
+    var img = try jp_img.image_create(4, 4);
     const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
@@ -151,7 +151,7 @@ test "compute_bounding_rectangle_at_center" {
 }
 
 test "compute_bounding_rectangle_at_center_size_of_image" {
-    var img = try rgba_img.image_create(4, 4);
+    var img = try jp_img.image_create(4, 4);
     const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
@@ -169,7 +169,7 @@ test "compute_bounding_rectangle_at_center_size_of_image" {
 }
 
 test "compute_bounding_rectangle_at_center_larger_than_image" {
-    var img = try rgba_img.image_create(4, 4);
+    var img = try jp_img.image_create(4, 4);
     const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
@@ -187,7 +187,7 @@ test "compute_bounding_rectangle_at_center_larger_than_image" {
 }
 
 test "compute_bounding_rectangle_larger_at_positive_angle" {
-    var img = try rgba_img.image_create(4, 4);
+    var img = try jp_img.image_create(4, 4);
     const pos = types.Vec2u16{
         .x = 3,
         .y = 3,
@@ -205,7 +205,7 @@ test "compute_bounding_rectangle_larger_at_positive_angle" {
 }
 
 test "compute_bounding_rectangle_larger_at_negative_angle" {
-    var img = try rgba_img.image_create(4, 4);
+    var img = try jp_img.image_create(4, 4);
     const pos = types.Vec2u16{
         .x = 0,
         .y = 0,
@@ -223,9 +223,9 @@ test "compute_bounding_rectangle_larger_at_negative_angle" {
 }
 
 test "draw_rectange_at_center_check_colors" {
-    var img = try rgba_img.image_create(4, 4);
+    var img = try jp_img.image_create(4, 4);
 
-    const color = color_module.Color{
+    const color = jp_color.JpColor{
         .r = 15,
         .g = 30,
         .b = 255,
@@ -242,7 +242,7 @@ test "draw_rectange_at_center_check_colors" {
     };
 
     draw_rectangle(img, &pos, &size, &color);
-    // try rgba_img.image_prompt_to_console(img);
+    // try jp_img.image_prompt_to_console(img);
 
     // checking red.
     try std.testing.expectEqual(img.r[0][0], 0);
@@ -309,9 +309,9 @@ test "draw_rectange_at_center_check_colors" {
 }
 
 test "draw_circle_at_center" {
-    var img = try rgba_img.image_create(50, 50);
+    var img = try jp_img.image_create(50, 50);
 
-    const color = color_module.Color{
+    const color = jp_color.JpColor{
         .r = 15,
         .g = 30,
         .b = 255,
@@ -323,5 +323,5 @@ test "draw_circle_at_center" {
     };
     const center = 22;
     try draw_circle(img, &pos, center, &color);
-    try rgba_img.image_write_to_ppm(img, "draw_circle_at_center.ppm");
+    try jp_img.image_write_to_ppm(img, "draw_circle_at_center.ppm");
 }

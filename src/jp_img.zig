@@ -1,6 +1,6 @@
 const std = @import("std");
 const types = @import("types.zig");
-const color_module = @import("color.zig");
+const jp_color = @import("jp_color.zig");
 const stdout = std.io.getStdOut().writer();
 const allocator = std.heap.page_allocator;
 
@@ -11,7 +11,7 @@ const allocator = std.heap.page_allocator;
 //  |
 //  * -> x
 
-pub const Img = struct {
+pub const JpImg = struct {
     width: u16 = undefined,
     height: u16 = undefined,
     r: [][]u8 = undefined,
@@ -20,9 +20,9 @@ pub const Img = struct {
     a: [][]u8 = undefined,
 };
 
-pub fn image_create(width: u8, height: u8) !*Img {
-    const img = try allocator.create(Img);
-    img.* = Img{
+pub fn image_create(width: u8, height: u8) !*JpImg {
+    const img = try allocator.create(JpImg);
+    img.* = JpImg{
         .width = width,
         .height = height,
         .r = try matrix_create_2d_u8(width, height),
@@ -33,7 +33,7 @@ pub fn image_create(width: u8, height: u8) !*Img {
     return img;
 }
 
-pub fn image_delete(img: *Img) !void {
+pub fn image_delete(img: *JpImg) !void {
     try matrix_delete_2d_u8(&img.r);
     try matrix_delete_2d_u8(&img.g);
     try matrix_delete_2d_u8(&img.b);
@@ -46,7 +46,7 @@ pub fn image_delete(img: *Img) !void {
 //  * -> x
 //  |
 //  v y
-pub fn image_prompt_to_console(img: *Img) !void {
+pub fn image_prompt_to_console(img: *JpImg) !void {
     var _x: u16 = 0;
     var _y: u16 = undefined;
 
@@ -71,7 +71,7 @@ pub fn image_prompt_to_console(img: *Img) !void {
 //  * -> x
 //  |
 //  v y
-pub fn image_write_to_ppm(img: *Img, filename: []const u8) !void {
+pub fn image_write_to_ppm(img: *JpImg, filename: []const u8) !void {
     const file = try std.fs.cwd().createFile(
         filename,
         .{ .read = true },
@@ -107,7 +107,7 @@ pub fn image_write_to_ppm(img: *Img, filename: []const u8) !void {
     }
 }
 
-pub fn image_draw_at_px(img: *Img, x: u16, y: u16, color: color_module.Color) !void {
+pub fn image_draw_at_px(img: *JpImg, x: u16, y: u16, color: jp_color.JpColor) !void {
     // TODO HANDLE ERROR OUT OF RANGE!
     img.r[x][y] = color.r;
     img.g[x][y] = color.g;
