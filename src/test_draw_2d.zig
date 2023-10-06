@@ -98,9 +98,9 @@ test "draw_rectange_at_center_check_colors" {
     var img = try jp_img.image_create(4, 4);
 
     const color = jp_color.JpColor{
-        .r = 15,
-        .g = 30,
-        .b = 255,
+        .r = 0.1,
+        .g = 0.3,
+        .b = 1,
     };
 
     const pos = types.Vec2u16{
@@ -114,7 +114,6 @@ test "draw_rectange_at_center_check_colors" {
     };
 
     draw_2d.draw_rectangle(img, &pos, &size, &color);
-    // try jp_img.image_prompt_to_console(img);
 
     // checking red.
     try std.testing.expectEqual(img.r[0][0], 0);
@@ -123,13 +122,13 @@ test "draw_rectange_at_center_check_colors" {
     try std.testing.expectEqual(img.r[0][3], 0);
 
     try std.testing.expectEqual(img.r[1][0], 0);
-    try std.testing.expectEqual(img.r[1][1], 15);
-    try std.testing.expectEqual(img.r[1][2], 15);
+    try std.testing.expectEqual(img.r[1][1], 0.1);
+    try std.testing.expectEqual(img.r[1][2], 0.1);
     try std.testing.expectEqual(img.r[1][3], 0);
 
     try std.testing.expectEqual(img.r[2][0], 0);
-    try std.testing.expectEqual(img.r[2][1], 15);
-    try std.testing.expectEqual(img.r[2][2], 15);
+    try std.testing.expectEqual(img.r[2][1], 0.1);
+    try std.testing.expectEqual(img.r[2][2], 0.1);
     try std.testing.expectEqual(img.r[2][3], 0);
 
     try std.testing.expectEqual(img.r[3][0], 0);
@@ -144,13 +143,13 @@ test "draw_rectange_at_center_check_colors" {
     try std.testing.expectEqual(img.g[0][3], 0);
 
     try std.testing.expectEqual(img.g[1][0], 0);
-    try std.testing.expectEqual(img.g[1][1], 30);
-    try std.testing.expectEqual(img.g[1][2], 30);
+    try std.testing.expectEqual(img.g[1][1], 0.3);
+    try std.testing.expectEqual(img.g[1][2], 0.3);
     try std.testing.expectEqual(img.g[1][3], 0);
 
     try std.testing.expectEqual(img.g[2][0], 0);
-    try std.testing.expectEqual(img.g[2][1], 30);
-    try std.testing.expectEqual(img.g[2][2], 30);
+    try std.testing.expectEqual(img.g[2][1], 0.3);
+    try std.testing.expectEqual(img.g[2][2], 0.3);
     try std.testing.expectEqual(img.g[2][3], 0);
 
     try std.testing.expectEqual(img.g[3][0], 0);
@@ -165,13 +164,13 @@ test "draw_rectange_at_center_check_colors" {
     try std.testing.expectEqual(img.b[0][3], 0);
 
     try std.testing.expectEqual(img.b[1][0], 0);
-    try std.testing.expectEqual(img.b[1][1], 255);
-    try std.testing.expectEqual(img.b[1][2], 255);
+    try std.testing.expectEqual(img.b[1][1], 1);
+    try std.testing.expectEqual(img.b[1][2], 1);
     try std.testing.expectEqual(img.b[1][3], 0);
 
     try std.testing.expectEqual(img.b[2][0], 0);
-    try std.testing.expectEqual(img.b[2][1], 255);
-    try std.testing.expectEqual(img.b[2][2], 255);
+    try std.testing.expectEqual(img.b[2][1], 1);
+    try std.testing.expectEqual(img.b[2][2], 1);
     try std.testing.expectEqual(img.b[2][3], 0);
 
     try std.testing.expectEqual(img.b[3][0], 0);
@@ -184,9 +183,9 @@ test "draw_circle_at_center" {
     var img = try jp_img.image_create(50, 50);
 
     const color = jp_color.JpColor{
-        .r = 15,
-        .g = 30,
-        .b = 255,
+        .r = 0.1,
+        .g = 0.3,
+        .b = 1,
     };
 
     const pos = types.Vec2u16{

@@ -8,39 +8,6 @@ const jp_ray = @import("jp_ray.zig");
 const jp_scene = @import("jp_scene.zig");
 const jp_object = @import("jp_object.zig");
 
-pub fn get_ray_direction_from_focal_plane(
-    camera: *const jp_object.JpObject,
-    focal_plane_center: types.Vec3f32,
-    screen_width: f32,
-    screen_height: f32,
-    pixel_size: f32,
-    x: f32,
-    y: f32,
-) types.Vec3f32 {
-    // + pixel_size / 2 -> hitting the middle of the pixel
-    const focal_plane_center_to_px_position = types.Vec3f32{
-        .x = (x - screen_width / 2) * pixel_size + pixel_size / 2,
-        .y = (y - screen_height / 2) * pixel_size + pixel_size / 2,
-        .z = 0,
-    };
-    const screen_px_focal_plane_position = focal_plane_center.sum_vector(
-        &focal_plane_center_to_px_position,
-    );
-    const ray_direction = screen_px_focal_plane_position.substract_vector(
-        &camera.tmatrix.get_position(),
-    );
-    return ray_direction;
-}
-
-pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
-    // camera.pos + camera.direction * focal_length
-    var weighted_direction = camera.shape.Camera.direction.product_scalar(
-        camera.shape.Camera.focal_length,
-    );
-    var position = camera.tmatrix.get_position();
-    return position.sum_vector(&weighted_direction);
-}
-
 pub fn render(
     img: *jp_img.JpImg,
     camera: *jp_object.JpObject,
@@ -109,4 +76,37 @@ pub fn get_pixel_size(
     const focal_plane_width: f32 = (@tan(half_fov_radiant) * focal_length) * 2;
     const pixel_size: f32 = focal_plane_width / img_width;
     return pixel_size;
+}
+
+pub fn get_ray_direction_from_focal_plane(
+    camera: *const jp_object.JpObject,
+    focal_plane_center: types.Vec3f32,
+    screen_width: f32,
+    screen_height: f32,
+    pixel_size: f32,
+    x: f32,
+    y: f32,
+) types.Vec3f32 {
+    // + pixel_size / 2 -> hitting the middle of the pixel
+    const focal_plane_center_to_px_position = types.Vec3f32{
+        .x = (x - screen_width / 2) * pixel_size + pixel_size / 2,
+        .y = (y - screen_height / 2) * pixel_size + pixel_size / 2,
+        .z = 0,
+    };
+    const screen_px_focal_plane_position = focal_plane_center.sum_vector(
+        &focal_plane_center_to_px_position,
+    );
+    const ray_direction = screen_px_focal_plane_position.substract_vector(
+        &camera.tmatrix.get_position(),
+    );
+    return ray_direction;
+}
+
+pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
+    // camera.pos + camera.direction * focal_length
+    var weighted_direction = camera.shape.Camera.direction.product_scalar(
+        camera.shape.Camera.focal_length,
+    );
+    var position = camera.tmatrix.get_position();
+    return position.sum_vector(&weighted_direction);
 }

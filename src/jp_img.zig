@@ -14,10 +14,10 @@ const allocator = std.heap.page_allocator;
 pub const JpImg = struct {
     width: u16 = undefined,
     height: u16 = undefined,
-    r: [][]u8 = undefined,
-    g: [][]u8 = undefined,
-    b: [][]u8 = undefined,
-    a: [][]u8 = undefined,
+    r: [][]f32 = undefined,
+    g: [][]f32 = undefined,
+    b: [][]f32 = undefined,
+    a: [][]f32 = undefined,
 };
 
 pub fn image_create(width: u16, height: u16) !*JpImg {
@@ -25,19 +25,19 @@ pub fn image_create(width: u16, height: u16) !*JpImg {
     img.* = JpImg{
         .width = width,
         .height = height,
-        .r = try matrix_create_2d_u8(width, height),
-        .g = try matrix_create_2d_u8(width, height),
-        .b = try matrix_create_2d_u8(width, height),
-        .a = try matrix_create_2d_u8(width, height),
+        .r = try matrix_create_2d_f32(width, height),
+        .g = try matrix_create_2d_f32(width, height),
+        .b = try matrix_create_2d_f32(width, height),
+        .a = try matrix_create_2d_f32(width, height),
     };
     return img;
 }
 
 pub fn image_delete(img: *JpImg) !void {
-    try matrix_delete_2d_u8(&img.r);
-    try matrix_delete_2d_u8(&img.g);
-    try matrix_delete_2d_u8(&img.b);
-    try matrix_delete_2d_u8(&img.a);
+    try matrix_delete_2d_f32(&img.r);
+    try matrix_delete_2d_f32(&img.g);
+    try matrix_delete_2d_f32(&img.b);
+    try matrix_delete_2d_f32(&img.a);
     allocator.destroy(img);
 }
 
@@ -53,7 +53,7 @@ pub fn image_prompt_to_console(img: *JpImg) !void {
     while (_x < img.width) : (_x += 1) {
         _y = img.height - 1;
         while (_y != 0) : (_y -= 1) {
-            var value: u8 = img.r[_x][_y];
+            var value: f32 = img.r[_x][_y];
             var c: u8 = undefined;
             if (value == 0) {
                 c = '.';
@@ -96,9 +96,9 @@ pub fn image_write_to_ppm(img: *JpImg, filename: []const u8) !void {
                 allocator,
                 "\n{} {} {}",
                 .{
-                    img.r[_x][_y - 1],
-                    img.g[_x][_y - 1],
-                    img.b[_x][_y - 1],
+                    jp_color.cast_jp_color_to_u8(img.r[_x][_y - 1]),
+                    jp_color.cast_jp_color_to_u8(img.g[_x][_y - 1]),
+                    jp_color.cast_jp_color_to_u8(img.b[_x][_y - 1]),
                 },
             );
             try file.writeAll(line);
@@ -108,16 +108,15 @@ pub fn image_write_to_ppm(img: *JpImg, filename: []const u8) !void {
 }
 
 pub fn image_draw_at_px(img: *JpImg, x: u16, y: u16, color: jp_color.JpColor) !void {
-    // TODO HANDLE ERROR OUT OF RANGE!
     img.r[x][y] = color.r;
     img.g[x][y] = color.g;
     img.b[x][y] = color.b;
 }
 
-pub fn matrix_create_2d_u8(x: u16, y: u16) ![][]u8 {
-    var matrix: [][]u8 = try allocator.alloc([]u8, x);
+pub fn matrix_create_2d_f32(x: u16, y: u16) ![][]f32 {
+    var matrix: [][]f32 = try allocator.alloc([]f32, x);
     for (matrix) |*row| {
-        row.* = try allocator.alloc(u8, y);
+        row.* = try allocator.alloc(f32, y);
         for (row.*, 0..) |_, i| {
             row.*[i] = 0;
         }
@@ -125,7 +124,7 @@ pub fn matrix_create_2d_u8(x: u16, y: u16) ![][]u8 {
     return matrix;
 }
 
-pub fn matrix_delete_2d_u8(matrix: *[][]u8) !void {
+pub fn matrix_delete_2d_f32(matrix: *[][]f32) !void {
     for (matrix.*) |*row| {
         allocator.free(row.*);
     }
