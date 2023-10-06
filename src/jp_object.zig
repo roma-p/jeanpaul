@@ -5,7 +5,7 @@ const allocator = std.heap.page_allocator;
 
 pub const JpObject = struct {
     tmatrix: *types.TMatrixf32 = undefined,
-    material: *jp_material.JpMaterial = &jp_material.JP_MATERIAL_DEFAULT,
+    material: *jp_material.JpMaterial = undefined,
     shape: *Shape = undefined,
     object_type: JpObjectType,
 };

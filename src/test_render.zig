@@ -3,6 +3,7 @@ const render = @import("render.zig");
 const types = @import("types.zig");
 const jp_img = @import("jp_img.zig");
 const jp_scene = @import("jp_scene.zig");
+const jp_color = @import("jp_color.zig");
 const jp_material = @import("jp_material.zig");
 const jp_object = @import("jp_object.zig");
 
@@ -112,7 +113,9 @@ test "render_one_sphere_at_center" {
 
     const sphere_1 = try jp_object.create_sphere();
     sphere_1.shape.Sphere.radius = 8;
-    sphere_1.material = &jp_material.JP_MATERIAL_BASE_RED;
+    sphere_1.material = try jp_material.create_default_colored_material(
+        jp_color.JP_COLOR_RED,
+    );
 
     var scene = try jp_scene.create_scene();
     try scene.add_object(sphere_1);
@@ -135,11 +138,15 @@ test "render_two_sphere_at_center" {
 
     const sphere_1 = try jp_object.create_sphere();
     sphere_1.shape.Sphere.radius = 7;
-    sphere_1.material = &jp_material.JP_MATERIAL_BASE_RED;
+    sphere_1.material = try jp_material.create_default_colored_material(
+        jp_color.JP_COLOR_RED,
+    );
 
     const sphere_2 = try jp_object.create_sphere();
     sphere_2.shape.Sphere.radius = 8;
-    sphere_2.material = &jp_material.JP_MATERIAL_BASE_BLUE;
+    sphere_2.material = try jp_material.create_default_colored_material(
+        jp_color.JP_COLOR_BLUE,
+    );
 
     try sphere_2.tmatrix.set_position(&types.Vec3f32{
         .x = 5,

@@ -161,7 +161,7 @@ pub fn render(
                 img,
                 _x,
                 _y,
-                _intersect_object.material.diffuse,
+                _intersect_object.material.mat.Lambert.diffuse,
             );
         }
     }
