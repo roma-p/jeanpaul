@@ -12,3 +12,9 @@ test "create_sphere" {
     try std.testing.expectEqual(sphere.shape.Sphere.radius, 10);
     jp_object.delete_obj(sphere);
 }
+
+test "create_light" {
+    const lgt = try jp_object.create_light_omni();
+    try std.testing.expectEqual(lgt.shape.LightOmni.intensity, 70);
+    jp_object.delete_obj(lgt);
+}

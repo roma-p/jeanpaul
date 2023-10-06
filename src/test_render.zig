@@ -28,7 +28,7 @@ test "get_focal_plane_center_on_valid_case" {
     try std.testing.expectEqual(center.z, -10);
 }
 
-test "render.get_ray_direction_on_valid_case" {
+test "render.get_ray_direction_from_focal_plane_on_valid_case" {
     const camera = try jp_object.create_camera();
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
@@ -38,65 +38,31 @@ test "render.get_ray_direction_on_valid_case" {
     });
     const focal_center = render.get_focal_plane_center(camera);
 
-    var ray_direction_1 = render.get_ray_direction(camera, focal_center, 30, 30, 1, 0, 0);
+    var ray_direction_1 = render.get_ray_direction_from_focal_plane(
+        camera,
+        focal_center,
+        30,
+        30,
+        1,
+        0,
+        0,
+    );
     try std.testing.expectEqual(ray_direction_1.x, -14.5);
     try std.testing.expectEqual(ray_direction_1.y, -14.5);
     try std.testing.expectEqual(ray_direction_1.z, 10);
 
-    var ray_direction_2 = render.get_ray_direction(camera, focal_center, 30, 30, 1, 16, 20);
+    var ray_direction_2 = render.get_ray_direction_from_focal_plane(
+        camera,
+        focal_center,
+        30,
+        30,
+        1,
+        16,
+        20,
+    );
     try std.testing.expectEqual(ray_direction_2.x, 1.5);
     try std.testing.expectEqual(ray_direction_2.y, 5.5);
     try std.testing.expectEqual(ray_direction_2.z, 10);
-}
-
-test "render.check_ray_intersect_with_sphere_basic_test" {
-    const camera = try jp_object.create_camera();
-    camera.shape.Camera.focal_length = 10;
-    try camera.tmatrix.set_position(&types.Vec3f32{
-        .x = 0,
-        .y = 0,
-        .z = -20,
-    });
-
-    const focal_center = render.get_focal_plane_center(camera);
-    var sphere_position = types.Vec3f32{ .x = 0, .y = 0, .z = 0 };
-    var radius: f32 = 10;
-
-    var intersect_position: types.Vec3f32 = undefined;
-    var intersect_ray_multiplier: f32 = undefined;
-
-    var ray_direction_1 = render.get_ray_direction(camera, focal_center, 30, 30, 1, 0, 0);
-    const intersect_1 = try render.check_ray_intersect_with_sphere(
-        ray_direction_1,
-        camera.tmatrix.get_position(),
-        sphere_position,
-        radius,
-        &intersect_position,
-        &intersect_ray_multiplier,
-    );
-
-    try std.testing.expectEqual(intersect_1, false);
-    var ray_direction_2 = render.get_ray_direction(camera, focal_center, 30, 30, 1, 15, 15);
-    const intersect_2 = try render.check_ray_intersect_with_sphere(
-        ray_direction_2,
-        camera.tmatrix.get_position(),
-        sphere_position,
-        radius,
-        &intersect_position,
-        &intersect_ray_multiplier,
-    );
-    try std.testing.expectEqual(intersect_2, true);
-
-    var ray_direction_3 = render.get_ray_direction(camera, focal_center, 30, 30, 1, 29, 29);
-    const intersect_3 = try render.check_ray_intersect_with_sphere(
-        ray_direction_3,
-        camera.tmatrix.get_position(),
-        sphere_position,
-        radius,
-        &intersect_position,
-        &intersect_ray_multiplier,
-    );
-    try std.testing.expectEqual(intersect_3, false);
 }
 
 test "render_one_sphere_at_center" {

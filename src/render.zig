@@ -3,12 +3,12 @@ const allocator = std.heap.page_allocator;
 const stdout = std.io.getStdOut().writer();
 
 const types = @import("types.zig");
-const math_utils = @import("math_utils.zig");
 const jp_img = @import("jp_img.zig");
+const jp_ray = @import("jp_ray.zig");
 const jp_scene = @import("jp_scene.zig");
 const jp_object = @import("jp_object.zig");
 
-pub fn get_ray_direction(
+pub fn get_ray_direction_from_focal_plane(
     camera: *const jp_object.JpObject,
     focal_plane_center: types.Vec3f32,
     screen_width: f32,
@@ -41,46 +41,6 @@ pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
     return position.sum_vector(&weighted_direction);
 }
 
-pub fn check_ray_intersect_with_sphere(
-    ray_direction: types.Vec3f32,
-    ray_origin: types.Vec3f32,
-    sphere_position: types.Vec3f32,
-    sphere_radius: f32,
-    intersect_position: *types.Vec3f32,
-    intersect_ray_multiplier: *f32,
-) !bool {
-    // - equation of the ray is : ray_origin + t * ray_direction = P
-    //   where t is a scalar and p a Vec3f32 position on the 3d space.
-    // - equation of the sphere is: (P - sphere_position) ^2 - r^2 = 0
-    //   therefore we want to resolve : (ray_origin + t * ray_direction - sphere_position)^2 - r^2 = 0
-    //   which is quatratic equation at^2 + bt + c = 0 where:
-    //   a = ray_direction^2
-    //   b = 2 * ray_direction * (ray_origin - sphere_position)
-    //   c = (ray_origin - sphere_position) ^2 - r^2
-    const L = ray_origin.substract_vector(&sphere_position); // from ray origin to sphere center
-
-    const a: f32 = ray_direction.product_dot(&ray_direction);
-    const b: f32 = 2 * (ray_direction.product_dot(&L));
-    const c: f32 = L.product_dot(&L) - (sphere_radius * sphere_radius);
-
-    var t0: f32 = undefined;
-    var t1: f32 = undefined;
-    const has_solution = try math_utils.solve_quadratic(a, b, c, &t0, &t1);
-    if (has_solution == false) {
-        return false;
-    }
-    var t: f32 = undefined;
-    if (t0 > t1) {
-        t = t1;
-    } else {
-        t = t0;
-    }
-
-    intersect_position.* = ray_direction.product_scalar(t).sum_vector(&ray_origin);
-    intersect_ray_multiplier.* = t;
-    return true;
-}
-
 pub fn render(
     img: *jp_img.JpImg,
     camera: *jp_object.JpObject,
@@ -103,9 +63,6 @@ pub fn render(
 
     var _ray_direction: types.Vec3f32 = undefined;
 
-    var _t_current: f32 = undefined;
-    var _t_min: f32 = undefined;
-
     var _intersect_one_obj: bool = undefined;
     var _intersect_position: types.Vec3f32 = undefined;
     var _intersect_object: jp_object.JpObject = undefined;
@@ -113,7 +70,7 @@ pub fn render(
     while (_x < img.width) : (_x += 1) {
         _y = img.height - 1;
         while (_y != 0) : (_y -= 1) {
-            _ray_direction = get_ray_direction(
+            _ray_direction = get_ray_direction_from_focal_plane(
                 camera,
                 focal_center,
                 img_width,
@@ -122,38 +79,13 @@ pub fn render(
                 types.cast_u16_to_f32(_x),
                 types.cast_u16_to_f32(_y),
             );
-            _intersect_one_obj = false;
-            _t_min = 0;
-            for (scene.objects.items) |obj| {
-                if (obj.object_type == jp_object.JpObjectType.Mesh) {
-                    unreachable;
-                }
-                var does_intersect: bool = undefined;
-                switch (obj.shape.*) {
-                    .Sphere => {
-                        does_intersect = try check_ray_intersect_with_sphere(
-                            _ray_direction,
-                            camera_position,
-                            obj.tmatrix.get_position(),
-                            obj.shape.Sphere.radius,
-                            &_intersect_position,
-                            &_t_current,
-                        );
-                    },
-                    else => {
-                        unreachable;
-                    },
-                }
-                if (does_intersect) {
-                    _intersect_one_obj = true;
-                } else {
-                    continue;
-                }
-                if (_t_min == 0 or _t_current < _t_min) {
-                    _intersect_object = obj.*;
-                    _t_min = _t_current;
-                }
-            }
+            _intersect_one_obj = try jp_ray.shot_ray(
+                camera_position,
+                &_intersect_object,
+                &_intersect_position,
+                _ray_direction,
+                scene,
+            );
             if (_intersect_one_obj == false) {
                 continue;
             }

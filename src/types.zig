@@ -95,6 +95,8 @@ const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
     [_]f32{ 0, 0, 0, 1 },
 };
 
+pub const JP_EPSILON = 0.00001;
+
 pub fn cast_u16_to_f32(input: u16) f32 {
     // didn't find how to do this directly without casting as int first...
     // used mainly to go from screen space (2d u16 array) to 3d space (3d f32 array)
