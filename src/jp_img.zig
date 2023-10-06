@@ -20,7 +20,7 @@ pub const JpImg = struct {
     a: [][]u8 = undefined,
 };
 
-pub fn image_create(width: u8, height: u8) !*JpImg {
+pub fn image_create(width: u16, height: u16) !*JpImg {
     const img = try allocator.create(JpImg);
     img.* = JpImg{
         .width = width,
@@ -114,7 +114,7 @@ pub fn image_draw_at_px(img: *JpImg, x: u16, y: u16, color: jp_color.JpColor) !v
     img.b[x][y] = color.b;
 }
 
-fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
+pub fn matrix_create_2d_u8(x: u16, y: u16) ![][]u8 {
     var matrix: [][]u8 = try allocator.alloc([]u8, x);
     for (matrix) |*row| {
         row.* = try allocator.alloc(u8, y);
@@ -125,30 +125,9 @@ fn matrix_create_2d_u8(x: u8, y: u8) ![][]u8 {
     return matrix;
 }
 
-fn matrix_delete_2d_u8(matrix: *[][]u8) !void {
+pub fn matrix_delete_2d_u8(matrix: *[][]u8) !void {
     for (matrix.*) |*row| {
         allocator.free(row.*);
     }
     allocator.free(matrix.*);
-}
-
-test "matrix_create_and_delete" {
-    var matrix = try matrix_create_2d_u8(3, 2);
-    matrix[0][0] = 1;
-    try std.testing.expectEqual(matrix[0][0], 1);
-    try matrix_delete_2d_u8(&matrix);
-}
-test "image_create_and_delete" {
-    var img = try image_create(3, 2);
-    img.r[0][0] = 1;
-    try std.testing.expectEqual(img.r[0][0], 1);
-    try image_prompt_to_console(img);
-    try image_delete(img);
-}
-
-test "image_write_to_ppm_basic" {
-    var img = try image_create(3, 3);
-    img.r[0][0] = 1;
-    try image_write_to_ppm(img, "image_write_to_ppm_basic.ppm");
-    try image_delete(img);
 }

@@ -3,6 +3,11 @@ pub const Vec2u16 = struct {
     y: u16 = undefined,
 };
 
+pub const Vec2f32 = struct {
+    x: f32 = undefined,
+    y: f32 = undefined,
+};
+
 pub const Vec3f32 = struct {
     x: f32 = undefined,
     y: f32 = undefined,

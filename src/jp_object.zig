@@ -23,6 +23,7 @@ const ShapeSphere = struct {
 
 const ShapeCamera = struct {
     focal_length: f32 = 10,
+    field_of_view: f32 = 60,
     direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
 };
 
@@ -77,16 +78,4 @@ pub fn create_t_matrix() !*types.TMatrixf32 {
     var tmatrix = try allocator.create(types.TMatrixf32);
     tmatrix.* = types.TMatrixf32{ .m = m.* };
     return tmatrix;
-}
-
-test "create_camera" {
-    const camera = try create_camera();
-    try std.testing.expectEqual(camera.shape.Camera.focal_length, 10);
-    delete_obj(camera);
-}
-
-test "create_sphere" {
-    const sphere = try create_sphere();
-    try std.testing.expectEqual(sphere.shape.Sphere.radius, 10);
-    delete_obj(sphere);
 }

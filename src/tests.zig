@@ -1,16 +1,12 @@
 const std = @import("std");
 
-// comptime {
-//     _ = @import("rgba_img.zig");
-//     _ = @import("draw_2d_shapes.zig");
-//     _ = @import("obj_primitives.zig");
-//     // _ = @import("camera.zig");
-// }
-
-pub const r = @import("rgba_img.zig");
-pub const d = @import("draw_2d_shapes.zig");
-pub const o = @import("obj_primitives.zig");
-// pub const c = @import("camera.zig");
+comptime {
+    _ = @import("test_draw_2d.zig");
+    _ = @import("test_jp_img.zig");
+    _ = @import("test_jp_object.zig");
+    _ = @import("test_jp_scene.zig");
+    _ = @import("test_render.zig");
+}
 
 test {
     std.testing.refAllDecls(@This());
