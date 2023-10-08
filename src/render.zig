@@ -6,7 +6,10 @@ const types = @import("types.zig");
 const jp_img = @import("jp_img.zig");
 const jp_ray = @import("jp_ray.zig");
 const jp_scene = @import("jp_scene.zig");
+const jp_color = @import("jp_color.zig");
 const jp_object = @import("jp_object.zig");
+const jp_material = @import("jp_material.zig");
+const render_shader = @import("render_shader.zig");
 
 pub fn render(
     img: *jp_img.JpImg,
@@ -28,16 +31,10 @@ pub fn render(
     var _x: u16 = 0;
     var _y: u16 = undefined;
 
-    var _ray_direction: types.Vec3f32 = undefined;
-
-    var _intersect_one_obj: bool = undefined;
-    var _intersect_position: types.Vec3f32 = undefined;
-    var _intersect_object: jp_object.JpObject = undefined;
-
     while (_x < img.width) : (_x += 1) {
         _y = img.height - 1;
         while (_y != 0) : (_y -= 1) {
-            _ray_direction = get_ray_direction_from_focal_plane(
+            var _ray_direction = get_ray_direction_from_focal_plane(
                 camera,
                 focal_center,
                 img_width,
@@ -46,22 +43,34 @@ pub fn render(
                 types.cast_u16_to_f32(_x),
                 types.cast_u16_to_f32(_y),
             );
-            _intersect_one_obj = try jp_ray.shot_ray(
+            var _intersection: jp_ray.JpRayIntersection = undefined;
+            var _intersect_one_obj = try jp_ray.shot_ray(
                 camera_position,
-                &_intersect_object,
-                &_intersect_position,
+                &_intersection,
                 _ray_direction,
                 scene,
             );
             if (_intersect_one_obj == false) {
+                _intersection = undefined;
                 continue;
             }
-            try jp_img.image_draw_at_px(
-                img,
-                _x,
-                _y,
-                _intersect_object.material.mat.Lambert.diffuse,
-            );
+
+            var object: jp_object.JpObject = _intersection.object.*;
+            const position: types.Vec3f32 = _intersection.position;
+            const normal = jp_object.get_normal_at_position(&object, position);
+
+            var color_at_px: jp_color.JpColor = undefined;
+            switch (_intersection.object.material.mat.*) {
+                .Lambert => color_at_px = render_shader.render_lambert(
+                    _intersection.position,
+                    normal,
+                    object.material,
+                    scene,
+                ),
+            }
+            try jp_img.image_draw_at_px(img, _x, _y, color_at_px);
+            _intersection = undefined;
+            color_at_px = undefined;
         }
     }
 }

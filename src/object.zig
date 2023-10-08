@@ -8,6 +8,7 @@ pub const Object = struct {
     material: *material.Material = &material.MATERIAL_DEFAULT,
     shape: *Shape = undefined,
     object_type: ObjectType,
+    object_name: []u8 = undefined,
 };
 
 pub const ObjectType = enum { Camera, Light, Mesh, Implicit };
@@ -26,7 +27,7 @@ pub const ShapeCamera = struct {
     direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
 };
 
-pub fn create_sphere() !*Object {
+pub fn create_sphere(name: []u8) !*Object {
     var sphere = try allocator.create(ShapeSphere);
     sphere.* = ShapeSphere{};
     var obj = try allocator.create(Object);
@@ -37,11 +38,12 @@ pub fn create_sphere() !*Object {
         .shape = shape,
         .object_type = ObjectType.Implicit,
         .tmatrix = tmatrix,
+        .object_name = name,
     };
     return obj;
 }
 
-pub fn create_camera() !*Object {
+pub fn create_camera(name: []u8) !*Object {
     var camera = try allocator.create(ShapeCamera);
     camera.* = ShapeCamera{};
     var obj = try allocator.create(Object);
@@ -52,6 +54,7 @@ pub fn create_camera() !*Object {
         .shape = shape,
         .object_type = ObjectType.Camera,
         .tmatrix = tmatrix,
+        .object_name = name,
     };
     return obj;
 }

@@ -41,6 +41,15 @@ pub const Vec3f32 = struct {
     pub fn product_dot(self: *const Vec3f32, vec: *const Vec3f32) f32 {
         return self.x * vec.x + self.y * vec.y + self.z * vec.z;
     }
+
+    pub fn normalize(self: *const Vec3f32) Vec3f32 {
+        const magnitude = @sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+        return Vec3f32{
+            .x = self.x / magnitude,
+            .y = self.y / magnitude,
+            .z = self.z / magnitude,
+        };
+    }
 };
 
 pub const BoudingRectangleu16 = struct {
@@ -95,7 +104,7 @@ const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
     [_]f32{ 0, 0, 0, 1 },
 };
 
-pub const JP_EPSILON = 0.00001;
+pub const JP_EPSILON = 0.000001;
 
 pub fn cast_u16_to_f32(input: u16) f32 {
     // didn't find how to do this directly without casting as int first...
@@ -103,4 +112,13 @@ pub fn cast_u16_to_f32(input: u16) f32 {
     const tmp: i32 = input;
     const ret: f32 = @floatFromInt(tmp);
     return ret;
+}
+
+pub fn absolute(number: f32) f32 {
+    // didn't succeeded to make "@abs" builtin work so reimplementing it...
+    if (number >= 0) {
+        return number;
+    } else {
+        return number + 2 * number;
+    }
 }

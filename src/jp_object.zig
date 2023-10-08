@@ -9,11 +9,12 @@ pub const JpObject = struct {
     material: *jp_material.JpMaterial = undefined,
     shape: *Shape = undefined,
     object_type: JpObjectType,
+    object_name: []const u8,
 };
 
 pub const JpObjectType = enum { Camera, Light, Mesh, Implicit };
 
-pub fn create_sphere() !*JpObject {
+pub fn create_sphere(name: []const u8) !*JpObject {
     var sphere = try allocator.create(ShapeSphere);
     sphere.* = ShapeSphere{};
     var obj = try allocator.create(JpObject);
@@ -24,11 +25,12 @@ pub fn create_sphere() !*JpObject {
         .shape = shape,
         .object_type = JpObjectType.Implicit,
         .tmatrix = tmatrix,
+        .object_name = name,
     };
     return obj;
 }
 
-pub fn create_camera() !*JpObject {
+pub fn create_camera(name: []const u8) !*JpObject {
     var camera = try allocator.create(ShapeCamera);
     camera.* = ShapeCamera{};
     var obj = try allocator.create(JpObject);
@@ -39,11 +41,12 @@ pub fn create_camera() !*JpObject {
         .shape = shape,
         .object_type = JpObjectType.Camera,
         .tmatrix = tmatrix,
+        .object_name = name,
     };
     return obj;
 }
 
-pub fn create_light_omni() !*JpObject {
+pub fn create_light_omni(name: []const u8) !*JpObject {
     var light = try allocator.create(ShapeLightOmni);
     light.* = ShapeLightOmni{};
     var obj = try allocator.create(JpObject);
@@ -54,8 +57,29 @@ pub fn create_light_omni() !*JpObject {
         .shape = shape,
         .object_type = JpObjectType.Light,
         .tmatrix = tmatrix,
+        .object_name = name,
     };
     return obj;
+}
+
+pub fn get_normal_at_position(obj: *JpObject, position: types.Vec3f32) types.Vec3f32 {
+    var normal: types.Vec3f32 = undefined;
+    switch (obj.shape.*) {
+        .Sphere => {
+            normal = get_normal_point_at_position_sphere(obj, position);
+        },
+        else => unreachable,
+    }
+    return normal;
+}
+
+fn get_normal_point_at_position_sphere(
+    obj: *JpObject,
+    position: types.Vec3f32,
+) types.Vec3f32 {
+    var ret: types.Vec3f32 = position.substract_vector(&obj.tmatrix.get_position());
+    ret = ret.normalize();
+    return ret;
 }
 
 pub fn delete_obj(obj: *JpObject) void {
@@ -99,6 +123,5 @@ const ShapeCamera = struct {
 };
 
 const ShapeLightOmni = struct {
-    intensity: u16 = 70, // % -> default in c4d is 70.
-    color: jp_color.JpColor = jp_color.JP_COLOR_WHITE,
+    color: jp_color.JpColor = jp_color.JP_COLOR_GREY,
 };

@@ -4,10 +4,15 @@ const math_utils = @import("math_utils.zig");
 const jp_object = @import("jp_object.zig");
 const jp_scene = @import("jp_scene.zig");
 
+pub const JpRayIntersection = struct {
+    object: *jp_object.JpObject,
+    position: types.Vec3f32,
+    distance: f32,
+};
+
 pub fn shot_ray(
     origin_position: types.Vec3f32,
-    intersect_object: *jp_object.JpObject,
-    intersect_position: *types.Vec3f32,
+    intersection: *JpRayIntersection,
     ray_direction: types.Vec3f32,
     scene: *jp_scene.JpScene,
 ) !bool {
@@ -20,8 +25,10 @@ pub fn shot_ray(
     // this is done to prevent the ray to collide with its origin object at its origin.
     // BUT! As a consequence, if there is another object at this exact position,
     // intersection won't be detected.
-    const _shift: types.Vec3f32 = ray_direction.product_scalar(types.JP_EPSILON);
-    const _shift_origin_position: types.Vec3f32 = origin_position.sum_vector(&_shift);
+
+    // const _shift: types.Vec3f32 = ray_direction.product_scalar(types.JP_EPSILON);
+    // const _shift_origin_position: types.Vec3f32 = origin_position.sum_vector(&_shift);
+    const _shift_origin_position = origin_position;
 
     for (scene.objects.items) |obj| {
         if (obj.object_type == jp_object.JpObjectType.Mesh) {
@@ -55,10 +62,15 @@ pub fn shot_ray(
     if (_intersect_one_obj == false) {
         return false;
     }
-    intersect_object.* = _intersect_object;
-    intersect_position.* = ray_direction.product_scalar(_t_min).sum_vector(
-        &_shift_origin_position,
-    );
+
+    intersection.* = JpRayIntersection{
+        .object = &_intersect_object,
+        .position = ray_direction.product_scalar(_t_min).sum_vector(
+            &_shift_origin_position,
+        ),
+        .distance = _t_min,
+    };
+
     return true;
 }
 

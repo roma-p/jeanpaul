@@ -15,7 +15,7 @@ test "get_pixel_size" {
 }
 
 test "get_focal_plane_center_on_valid_case" {
-    var camera = try jp_object.create_camera();
+    var camera = try jp_object.create_camera("camera");
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -29,7 +29,7 @@ test "get_focal_plane_center_on_valid_case" {
 }
 
 test "render.get_ray_direction_from_focal_plane_on_valid_case" {
-    const camera = try jp_object.create_camera();
+    const camera = try jp_object.create_camera("camera");
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
@@ -66,34 +66,43 @@ test "render.get_ray_direction_from_focal_plane_on_valid_case" {
 }
 
 test "render_one_sphere_at_center" {
-    const camera = try jp_object.create_camera();
+    const camera = try jp_object.create_camera("camera");
     camera.shape.Camera.focal_length = 10;
-    camera.shape.Camera.field_of_view = 120;
+    camera.shape.Camera.field_of_view = 60;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
         .z = -20,
     });
 
-    var img = try jp_img.image_create(30, 30);
+    var img = try jp_img.image_create(256, 256);
 
-    const sphere_1 = try jp_object.create_sphere();
+    const sphere_1 = try jp_object.create_sphere("sphere_1");
     sphere_1.shape.Sphere.radius = 8;
     sphere_1.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_RED,
     );
 
+    var light_1 = try jp_object.create_light_omni("light_1");
+    light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
+    try light_1.tmatrix.set_position(&types.Vec3f32{
+        .x = 20,
+        .y = 15,
+        .z = -15,
+    });
+
     var scene = try jp_scene.create_scene();
     try scene.add_object(sphere_1);
+    try scene.add_light(light_1);
 
     try render.render(img, camera, scene);
     try jp_img.image_write_to_ppm(img, "render_one_sphere_at_center.ppm");
 }
 
 test "render_two_sphere_at_center" {
-    const camera = try jp_object.create_camera();
+    const camera = try jp_object.create_camera("camera");
     camera.shape.Camera.focal_length = 10;
-    camera.shape.Camera.field_of_view = 90;
+    camera.shape.Camera.field_of_view = 70;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
@@ -102,27 +111,35 @@ test "render_two_sphere_at_center" {
 
     var img = try jp_img.image_create(256, 256);
 
-    const sphere_1 = try jp_object.create_sphere();
+    const sphere_1 = try jp_object.create_sphere("sphere_1");
     sphere_1.shape.Sphere.radius = 7;
     sphere_1.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_RED,
     );
 
-    const sphere_2 = try jp_object.create_sphere();
+    const sphere_2 = try jp_object.create_sphere("sphere_2");
     sphere_2.shape.Sphere.radius = 8;
     sphere_2.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_BLUE,
     );
-
     try sphere_2.tmatrix.set_position(&types.Vec3f32{
         .x = 5,
         .y = 5,
         .z = -2,
     });
 
+    var light_1 = try jp_object.create_light_omni("light_1");
+    light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
+    try light_1.tmatrix.set_position(&types.Vec3f32{
+        .x = 20,
+        .y = 20,
+        .z = -20,
+    });
+
     var scene = try jp_scene.create_scene();
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
+    try scene.add_light(light_1);
 
     try render.render(img, camera, scene);
     try jp_img.image_write_to_ppm(img, "render_two_sphere_at_center.ppm");

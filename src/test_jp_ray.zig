@@ -5,7 +5,7 @@ const jp_object = @import("jp_object.zig");
 const jp_ray = @import("jp_ray.zig");
 
 test "render.check_ray_intersect_with_sphere_basic_test" {
-    const camera = try jp_object.create_camera();
+    const camera = try jp_object.create_camera("camera");
     camera.shape.Camera.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,

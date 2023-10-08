@@ -23,7 +23,7 @@ pub const JpScene = struct {
         if (obj.object_type != jp_object.JpObjectType.Light) {
             unreachable;
         }
-        try self.objects.append(obj);
+        try self.lights.append(obj);
     }
 };
 
