@@ -88,7 +88,7 @@ test "render_one_sphere_at_center" {
         .z = -15,
     });
 
-    var scene = try jp_scene.create_scene();
+    var scene = try jp_scene.JpScene.new();
     scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_light(light_1);
@@ -131,7 +131,7 @@ test "render_two_sphere_at_center" {
         .z = -20,
     });
 
-    var scene = try jp_scene.create_scene();
+    var scene = try jp_scene.JpScene.new();
     scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
@@ -179,7 +179,7 @@ test "render_two_sphere_distanced" {
         .z = 0,
     });
 
-    var scene = try jp_scene.create_scene();
+    var scene = try jp_scene.JpScene.new();
     scene.resolution = types.Vec2u16{ .x = 1024, .y = 1024 };
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);

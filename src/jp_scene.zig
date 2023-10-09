@@ -12,7 +12,40 @@ pub const JpScene = struct {
     materials: std.ArrayList(*jp_object.JpObject),
     resolution: types.Vec2u16 = types.Vec2u16{ .x = 640, .y = 480 },
 
-    pub fn add_object(self: *JpScene, obj: *jp_object.JpObject) !void {
+    const Self = @This();
+
+    pub fn new() !*Self {
+        var scene = try allocator.create(Self);
+        scene.* = JpScene{
+            .objects = try std.ArrayList(*jp_object.JpObject).initCapacity(
+                allocator,
+                10,
+            ),
+            .lights = try std.ArrayList(*jp_object.JpObject).initCapacity(
+                allocator,
+                10,
+            ),
+            .cameras = try std.ArrayList(*jp_object.JpObject).initCapacity(
+                allocator,
+                10,
+            ),
+            .materials = try std.ArrayList(*jp_object.JpObject).initCapacity(
+                allocator,
+                10,
+            ),
+        };
+        return scene;
+    }
+
+    pub fn delete(self: *Self) void {
+        self.objects.deinit();
+        self.lights.deinit();
+        self.cameras.deinit();
+        self.materials.deinit();
+        allocator.destroy(self);
+    }
+
+    pub fn add_object(self: *Self, obj: *jp_object.JpObject) !void {
         if (obj.object_type != jp_object.JpObjectType.Implicit and
             obj.object_type != jp_object.JpObjectType.Mesh)
         {
@@ -21,7 +54,7 @@ pub const JpScene = struct {
         try self.objects.append(obj);
     }
 
-    pub fn add_light(self: *JpScene, obj: *jp_object.JpObject) !void {
+    pub fn add_light(self: *Self, obj: *jp_object.JpObject) !void {
         if (obj.object_type != jp_object.JpObjectType.Light) {
             unreachable;
         }
@@ -29,36 +62,5 @@ pub const JpScene = struct {
     }
 };
 
-pub fn create_scene() !*JpScene {
-    var scene = try allocator.create(JpScene);
-    scene.* = JpScene{
-        .objects = try std.ArrayList(*jp_object.JpObject).initCapacity(
-            allocator,
-            10,
-        ),
-        .lights = try std.ArrayList(*jp_object.JpObject).initCapacity(
-            allocator,
-            10,
-        ),
-        .cameras = try std.ArrayList(*jp_object.JpObject).initCapacity(
-            allocator,
-            10,
-        ),
-        .materials = try std.ArrayList(*jp_object.JpObject).initCapacity(
-            allocator,
-            10,
-        ),
-    };
-    return scene;
-}
-
 // pub fn export_as_jpp(path: []const u8) !void {
 // }
-
-pub fn destroy_scene(scene: *JpScene) void {
-    scene.objects.deinit();
-    scene.lights.deinit();
-    scene.cameras.deinit();
-    scene.materials.deinit();
-    allocator.destroy(scene);
-}

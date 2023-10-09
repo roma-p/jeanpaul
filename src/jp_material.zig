@@ -40,7 +40,3 @@ pub fn create_default_colored_material(color: jp_color.JpColor) !*JpMaterial {
     material.mat.Lambert.diffuse = color;
     return material;
 }
-
-// pub const JP_MATERIAL_DEFAULT = create_material_lambert();
-// pub var JP_MATERIAL_BASE_RED = create_default_color_material(jp_color.JP_COLOR_RED);
-// pub var JP_MATERIAL_BASE_BLUE = create_default_color_material(jp_color.JP_COLOR_BLUE);
