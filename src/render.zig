@@ -11,6 +11,17 @@ const jp_object = @import("jp_object.zig");
 const jp_material = @import("jp_material.zig");
 const render_shader = @import("render_shader.zig");
 
+pub fn render_to_path(
+    camera: *jp_object.JpObject,
+    scene: *jp_scene.JpScene,
+    filename: []const u8,
+) !void {
+    var img = try jp_img.JpImg.new(scene.resolution.x, scene.resolution.y);
+    try render(img, camera, scene);
+    try img.image_write_to_ppm(filename);
+    try img.delete();
+}
+
 pub fn render(
     img: *jp_img.JpImg,
     camera: *jp_object.JpObject,
@@ -68,7 +79,7 @@ pub fn render(
                     scene,
                 ),
             }
-            try jp_img.image_draw_at_px(img, _x, _y, color_at_px);
+            try img.image_draw_at_px(_x, _y, color_at_px);
             _intersection = undefined;
             color_at_px = undefined;
         }

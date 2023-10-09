@@ -21,20 +21,13 @@ pub fn shot_ray(
     var _t_min: f32 = 0;
     var _t_current: f32 = undefined;
 
-    // HACK: shift sligthly the origin of the ray in the ray direction.
-    // this is done to prevent the ray to collide with its origin object at its origin.
-    // BUT! As a consequence, if there is another object at this exact position,
-    // intersection won't be detected.
-
-    // const _shift: types.Vec3f32 = ray_direction.product_scalar(types.JP_EPSILON);
-    // const _shift_origin_position: types.Vec3f32 = origin_position.sum_vector(&_shift);
     const _shift_origin_position = origin_position;
 
     for (scene.objects.items) |obj| {
+        var does_intersect: bool = undefined;
         if (obj.object_type == jp_object.JpObjectType.Mesh) {
             unreachable;
         }
-        var does_intersect: bool = undefined;
         switch (obj.shape.*) {
             .Sphere => {
                 does_intersect = try check_ray_intersect_with_sphere(

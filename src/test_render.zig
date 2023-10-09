@@ -1,7 +1,6 @@
 const std = @import("std");
 const render = @import("render.zig");
 const types = @import("types.zig");
-const jp_img = @import("jp_img.zig");
 const jp_scene = @import("jp_scene.zig");
 const jp_color = @import("jp_color.zig");
 const jp_material = @import("jp_material.zig");
@@ -75,8 +74,6 @@ test "render_one_sphere_at_center" {
         .z = -20,
     });
 
-    var img = try jp_img.image_create(256, 256);
-
     const sphere_1 = try jp_object.create_sphere("sphere_1");
     sphere_1.shape.Sphere.radius = 8;
     sphere_1.material = try jp_material.create_default_colored_material(
@@ -92,11 +89,11 @@ test "render_one_sphere_at_center" {
     });
 
     var scene = try jp_scene.create_scene();
+    scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_light(light_1);
 
-    try render.render(img, camera, scene);
-    try jp_img.image_write_to_ppm(img, "render_one_sphere_at_center.ppm");
+    try render.render_to_path(camera, scene, "render_one_sphere_at_center.ppm");
 }
 
 test "render_two_sphere_at_center" {
@@ -108,8 +105,6 @@ test "render_two_sphere_at_center" {
         .y = 0,
         .z = -30,
     });
-
-    var img = try jp_img.image_create(256, 256);
 
     const sphere_1 = try jp_object.create_sphere("sphere_1");
     sphere_1.shape.Sphere.radius = 7;
@@ -137,10 +132,58 @@ test "render_two_sphere_at_center" {
     });
 
     var scene = try jp_scene.create_scene();
+    scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
     try scene.add_light(light_1);
 
-    try render.render(img, camera, scene);
-    try jp_img.image_write_to_ppm(img, "render_two_sphere_at_center.ppm");
+    try render.render_to_path(camera, scene, "render_two_sphere_at_center.ppm");
+}
+test "render_two_sphere_distanced" {
+    const camera = try jp_object.create_camera("camera");
+    camera.shape.Camera.focal_length = 10;
+    camera.shape.Camera.field_of_view = 70;
+    try camera.tmatrix.set_position(&types.Vec3f32{
+        .x = 0,
+        .y = 0,
+        .z = -30,
+    });
+
+    const sphere_1 = try jp_object.create_sphere("sphere_1");
+    sphere_1.shape.Sphere.radius = 7;
+    sphere_1.material = try jp_material.create_default_colored_material(
+        jp_color.JP_COLOR_RED,
+    );
+    try sphere_1.tmatrix.set_position(&types.Vec3f32{
+        .x = 0,
+        .y = 5,
+        .z = 0,
+    });
+
+    const sphere_2 = try jp_object.create_sphere("sphere_2");
+    sphere_2.shape.Sphere.radius = 6;
+    sphere_2.material = try jp_material.create_default_colored_material(
+        jp_color.JP_COLOR_BLUE,
+    );
+    try sphere_2.tmatrix.set_position(&types.Vec3f32{
+        .x = 0,
+        .y = -5,
+        .z = 0,
+    });
+
+    var light_1 = try jp_object.create_light_omni("light_1");
+    light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
+    try light_1.tmatrix.set_position(&types.Vec3f32{
+        .x = 0,
+        .y = 10,
+        .z = 0,
+    });
+
+    var scene = try jp_scene.create_scene();
+    scene.resolution = types.Vec2u16{ .x = 1024, .y = 1024 };
+    try scene.add_object(sphere_1);
+    try scene.add_object(sphere_2);
+    try scene.add_light(light_1);
+
+    try render.render_to_path(camera, scene, "render_two_sphere_distanced.ppm");
 }

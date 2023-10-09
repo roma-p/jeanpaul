@@ -6,9 +6,11 @@ const stdout = std.io.getStdOut().writer();
 const allocator = std.heap.page_allocator;
 
 pub const JpScene = struct {
-    // CAMERA / SCENE / LIGHT / MATERIAL
-    objects: std.ArrayList(*jp_object.JpObject),
     lights: std.ArrayList(*jp_object.JpObject),
+    objects: std.ArrayList(*jp_object.JpObject),
+    cameras: std.ArrayList(*jp_object.JpObject),
+    materials: std.ArrayList(*jp_object.JpObject),
+    resolution: types.Vec2u16 = types.Vec2u16{ .x = 640, .y = 480 },
 
     pub fn add_object(self: *JpScene, obj: *jp_object.JpObject) !void {
         if (obj.object_type != jp_object.JpObjectType.Implicit and
@@ -38,11 +40,25 @@ pub fn create_scene() !*JpScene {
             allocator,
             10,
         ),
+        .cameras = try std.ArrayList(*jp_object.JpObject).initCapacity(
+            allocator,
+            10,
+        ),
+        .materials = try std.ArrayList(*jp_object.JpObject).initCapacity(
+            allocator,
+            10,
+        ),
     };
     return scene;
 }
 
+// pub fn export_as_jpp(path: []const u8) !void {
+// }
+
 pub fn destroy_scene(scene: *JpScene) void {
     scene.objects.deinit();
+    scene.lights.deinit();
+    scene.cameras.deinit();
+    scene.materials.deinit();
     allocator.destroy(scene);
 }

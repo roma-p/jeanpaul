@@ -4,8 +4,10 @@ const jp_img = @import("jp_img.zig");
 const jp_color = @import("jp_color.zig");
 const types = @import("types.zig");
 
+const JpImg = jp_img.JpImg;
+
 test "draw_2d.compute_bounding_rectangle_at_center" {
-    var img = try jp_img.image_create(4, 4);
+    var img = try JpImg.new(4, 4);
     const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
@@ -23,7 +25,7 @@ test "draw_2d.compute_bounding_rectangle_at_center" {
 }
 
 test "draw_2d.compute_bounding_rectangle_at_center_size_of_image" {
-    var img = try jp_img.image_create(4, 4);
+    var img = try JpImg.new(4, 4);
     const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
@@ -41,7 +43,7 @@ test "draw_2d.compute_bounding_rectangle_at_center_size_of_image" {
 }
 
 test "draw_2d.compute_bounding_rectangle_at_center_larger_than_image" {
-    var img = try jp_img.image_create(4, 4);
+    var img = try JpImg.new(4, 4);
     const pos = types.Vec2u16{
         .x = 2,
         .y = 2,
@@ -59,7 +61,7 @@ test "draw_2d.compute_bounding_rectangle_at_center_larger_than_image" {
 }
 
 test "draw_2d.compute_bounding_rectangle_larger_at_positive_angle" {
-    var img = try jp_img.image_create(4, 4);
+    var img = try JpImg.new(4, 4);
     const pos = types.Vec2u16{
         .x = 3,
         .y = 3,
@@ -77,7 +79,7 @@ test "draw_2d.compute_bounding_rectangle_larger_at_positive_angle" {
 }
 
 test "draw_2d.compute_bounding_rectangle_larger_at_negative_angle" {
-    var img = try jp_img.image_create(4, 4);
+    var img = try JpImg.new(4, 4);
     const pos = types.Vec2u16{
         .x = 0,
         .y = 0,
@@ -95,7 +97,7 @@ test "draw_2d.compute_bounding_rectangle_larger_at_negative_angle" {
 }
 
 test "draw_rectange_at_center_check_colors" {
-    var img = try jp_img.image_create(4, 4);
+    var img = try JpImg.new(4, 4);
 
     const color = jp_color.JpColor{
         .r = 0.1,
@@ -180,7 +182,7 @@ test "draw_rectange_at_center_check_colors" {
 }
 
 test "draw_circle_at_center" {
-    var img = try jp_img.image_create(50, 50);
+    var img = try JpImg.new(50, 50);
 
     const color = jp_color.JpColor{
         .r = 0.1,
@@ -194,5 +196,5 @@ test "draw_circle_at_center" {
     };
     const center = 22;
     try draw_2d.draw_circle(img, &pos, center, &color);
-    try jp_img.image_write_to_ppm(img, "draw_circle_at_center.ppm");
+    try img.image_write_to_ppm("draw_circle_at_center.ppm");
 }

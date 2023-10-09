@@ -36,6 +36,7 @@ pub fn render_lambert(
         // const vector_to_light_normalised = vector_to_light.normalize();
         // const attenuation_factor = vector_to_light_normalised.product_dot(&normal);
         //
+        // TODO MULITPLY !!
         // var single_light_contribution = material.mat.Lambert.diffuse.sum_color(light.shape.LightOmni.color);
         // single_light_contribution = single_light_contribution.multiply(attenuation_factor);
         // light_color = light_color.sum_color(single_light_contribution);
