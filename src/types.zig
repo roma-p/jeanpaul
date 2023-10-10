@@ -1,3 +1,8 @@
+const std = @import("std");
+const allocator = std.heap.page_allocator;
+
+// ==== VECTORS ==============================================================
+
 pub const Vec2u16 = struct {
     x: u16 = undefined,
     y: u16 = undefined,
@@ -52,6 +57,8 @@ pub const Vec3f32 = struct {
     }
 };
 
+// ==== 2D BOUNDING RECTANGLE ================================================
+
 pub const BoudingRectangleu16 = struct {
     x_min: u16 = undefined,
     x_max: u16 = undefined,
@@ -59,8 +66,22 @@ pub const BoudingRectangleu16 = struct {
     y_max: u16 = undefined,
 };
 
+// ==== TRANSFORMATION MATRIX (4x4) ==========================================
+
 pub const TMatrixf32 = struct {
     m: [4][4]f32 = TRANSFORM_MATRIX_IDENTITY,
+
+    const Self = @This();
+
+    pub fn new() !*Self {
+        var matrix = try allocator.create(Self);
+        matrix.* = Self{};
+        return matrix;
+    }
+
+    pub fn delete(self: *Self) void {
+        allocator.destroy(self);
+    }
 
     pub fn set_position(
         self: *TMatrixf32,
@@ -105,6 +126,8 @@ const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
 };
 
 pub const JP_EPSILON = 0.000001;
+
+// ==== HELPERS ==============================================================
 
 pub fn cast_u16_to_f32(input: u16) f32 {
     // didn't find how to do this directly without casting as int first...

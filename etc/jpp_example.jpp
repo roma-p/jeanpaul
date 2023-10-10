@@ -1,0 +1,54 @@
+### Some info to be skipped.
+### Some more.
+
+scene
+{
+  resolution ! V 1 2
+  1920 1080
+  camera "camera/name"
+}
+
+camera.persp
+{
+  name "camera/name"
+  focal_lenght 10
+  field_of_view 60
+  direction ! V 3
+  0 0 1
+  tmatrix ! M 4 4
+  0 0 0 0
+  0 0 0 0
+  0 0 0 0
+  0 0 0 0
+}
+
+implicit.sphere
+{
+  name "somesphere"
+  tmatrix ! M 4 4
+  0 0 0 0
+  0 0 0 0
+  0 0 0 0
+  0 0 0 0
+  radius 5
+}
+
+light.omni
+{
+  name "light1"
+  tmatrix ! M 4 4
+  0 0 0 0
+  0 0 0 0
+  0 0 0 0
+  0 0 0 0
+  color ! V 3
+  255 0 0
+}
+
+# com to skip...
+material.Lambert
+{
+  name "lambert1"
+  diffuse ! V 3
+  255 0 0
+}

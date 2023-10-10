@@ -4,9 +4,13 @@ const types = @import("types.zig");
 const jp_object = @import("jp_object.zig");
 const jp_ray = @import("jp_ray.zig");
 
+const JpObject = jp_object.JpObject;
+const ShapeTypeId = jp_object.ShapeTypeId;
+
 test "render.check_ray_intersect_with_sphere_basic_test" {
-    const camera = try jp_object.create_camera("camera");
-    camera.shape.Camera.focal_length = 10;
+    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+    defer camera.delete();
+    camera.shape.CameraPersp.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,

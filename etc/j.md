@@ -1,4 +1,11 @@
 
+- objectType -> category
+- add type and hashmap to str to hasmap
+- add object contructor generic (get rid of 'create_sphere' ... -> will be in scene.
+- and about properties? I don't know...
+
+-----
+
 - normal: deux bugs... method in itself can segfault...
           position not given to get_normal_at_position...
 ? d'abord corriger normal? et inchallah ca corrige l'autre?

@@ -17,9 +17,10 @@ pub fn render_to_path(
     filename: []const u8,
 ) !void {
     var img = try jp_img.JpImg.new(scene.resolution.x, scene.resolution.y);
+    defer img.delete();
+
     try render(img, camera, scene);
     try img.image_write_to_ppm(filename);
-    try img.delete();
 }
 
 pub fn render(
@@ -34,8 +35,8 @@ pub fn render(
     const img_height: f32 = types.cast_u16_to_f32(img.*.height);
 
     const pixel_size = try get_pixel_size(
-        camera.shape.Camera.focal_length,
-        camera.shape.Camera.field_of_view,
+        camera.shape.CameraPersp.focal_length,
+        camera.shape.CameraPersp.field_of_view,
         img_width,
     );
 
@@ -124,8 +125,8 @@ pub fn get_ray_direction_from_focal_plane(
 
 pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
     // camera.pos + camera.direction * focal_length
-    var weighted_direction = camera.shape.Camera.direction.product_scalar(
-        camera.shape.Camera.focal_length,
+    var weighted_direction = camera.shape.CameraPersp.direction.product_scalar(
+        camera.shape.CameraPersp.focal_length,
     );
     var position = camera.tmatrix.get_position();
     return position.sum_vector(&weighted_direction);

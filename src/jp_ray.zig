@@ -3,11 +3,28 @@ const types = @import("types.zig");
 const math_utils = @import("math_utils.zig");
 const jp_object = @import("jp_object.zig");
 const jp_scene = @import("jp_scene.zig");
+const allocator = std.heap.page_allocator;
 
 pub const JpRayIntersection = struct {
     object: *jp_object.JpObject,
     position: types.Vec3f32,
     distance: f32,
+
+    const Self = @This();
+
+    pub fn new() !*Self {
+        var jp_ray_intersection = try allocator.create(Self);
+        jp_ray_intersection.* = Self{
+            .object = undefined,
+            .position = undefined,
+            .distance = undefined,
+        };
+        return jp_ray_intersection;
+    }
+
+    pub fn delete(self: *Self) void {
+        allocator.destroy(self);
+    }
 };
 
 pub fn shot_ray(
@@ -25,16 +42,16 @@ pub fn shot_ray(
 
     for (scene.objects.items) |obj| {
         var does_intersect: bool = undefined;
-        if (obj.object_type == jp_object.JpObjectType.Mesh) {
+        if (obj.object_category == jp_object.JpObjectCategory.Mesh) {
             unreachable;
         }
         switch (obj.shape.*) {
-            .Sphere => {
+            .ImplicitSphere => {
                 does_intersect = try check_ray_intersect_with_sphere(
                     ray_direction,
                     _shift_origin_position,
                     obj.tmatrix.get_position(),
-                    obj.shape.Sphere.radius,
+                    obj.shape.ImplicitSphere.radius,
                     &_t_current,
                 );
             },

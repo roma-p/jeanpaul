@@ -9,7 +9,7 @@ pub const JpScene = struct {
     lights: std.ArrayList(*jp_object.JpObject),
     objects: std.ArrayList(*jp_object.JpObject),
     cameras: std.ArrayList(*jp_object.JpObject),
-    materials: std.ArrayList(*jp_object.JpObject),
+    materials: std.ArrayList(*jp_object.JpObject), // TODO : material are not object
     resolution: types.Vec2u16 = types.Vec2u16{ .x = 640, .y = 480 },
 
     const Self = @This();
@@ -17,22 +17,10 @@ pub const JpScene = struct {
     pub fn new() !*Self {
         var scene = try allocator.create(Self);
         scene.* = JpScene{
-            .objects = try std.ArrayList(*jp_object.JpObject).initCapacity(
-                allocator,
-                10,
-            ),
-            .lights = try std.ArrayList(*jp_object.JpObject).initCapacity(
-                allocator,
-                10,
-            ),
-            .cameras = try std.ArrayList(*jp_object.JpObject).initCapacity(
-                allocator,
-                10,
-            ),
-            .materials = try std.ArrayList(*jp_object.JpObject).initCapacity(
-                allocator,
-                10,
-            ),
+            .lights = try std.ArrayList(*jp_object.JpObject).initCapacity(allocator, 10),
+            .cameras = try std.ArrayList(*jp_object.JpObject).initCapacity(allocator, 10),
+            .objects = try std.ArrayList(*jp_object.JpObject).initCapacity(allocator, 10),
+            .materials = try std.ArrayList(*jp_object.JpObject).initCapacity(allocator, 10),
         };
         return scene;
     }
@@ -46,8 +34,8 @@ pub const JpScene = struct {
     }
 
     pub fn add_object(self: *Self, obj: *jp_object.JpObject) !void {
-        if (obj.object_type != jp_object.JpObjectType.Implicit and
-            obj.object_type != jp_object.JpObjectType.Mesh)
+        if (obj.object_category != jp_object.JpObjectCategory.Implicit and
+            obj.object_category != jp_object.JpObjectCategory.Mesh)
         {
             unreachable;
         }
@@ -55,7 +43,7 @@ pub const JpScene = struct {
     }
 
     pub fn add_light(self: *Self, obj: *jp_object.JpObject) !void {
-        if (obj.object_type != jp_object.JpObjectType.Light) {
+        if (obj.object_category != jp_object.JpObjectCategory.Light) {
             unreachable;
         }
         try self.lights.append(obj);

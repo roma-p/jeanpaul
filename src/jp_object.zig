@@ -4,68 +4,84 @@ const jp_material = @import("jp_material.zig");
 const jp_color = @import("jp_color.zig");
 const allocator = std.heap.page_allocator;
 
+// ==== Constants ============================================================
+
+pub const ShapeTypeId = enum {
+    ImplicitSphere,
+    CameraPersp,
+    LightOmni,
+};
+
+pub const JpObjectCategory = enum {
+    Camera,
+    Light,
+    Mesh,
+    Implicit,
+};
+
+pub const Shape = union(enum) {
+    ImplicitSphere: *ShapeSphere,
+    CameraPersp: *ShapeCamera,
+    LightOmni: *ShapeLightOmni,
+};
+
+// ==== JpObject ==============================================================
+
 pub const JpObject = struct {
     tmatrix: *types.TMatrixf32 = undefined,
     material: *jp_material.JpMaterial = undefined,
     shape: *Shape = undefined,
-    object_type: JpObjectType,
+    object_category: JpObjectCategory,
     object_name: []const u8,
+
+    const Self = @This();
+
+    pub fn new(name: []const u8, shape_type_id: ShapeTypeId) !*Self {
+        var tmatrix = try types.TMatrixf32.new();
+        var obj = try allocator.create(JpObject);
+        obj.* = JpObject{
+            .shape = undefined,
+            .object_category = undefined, // set by builder
+            .tmatrix = tmatrix,
+            .object_name = name,
+        };
+        obj.shape = try shape_builder(shape_type_id, obj);
+        return obj;
+    }
+
+    pub fn delete(self: *Self) void {
+        shape_deleter(self);
+        self.tmatrix.delete();
+        allocator.destroy(self.tmatrix);
+        allocator.destroy(self);
+    }
 };
 
-pub const JpObjectType = enum { Camera, Light, Mesh, Implicit };
+// ==== Shape Definition =====================================================
 
-pub fn create_sphere(name: []const u8) !*JpObject {
-    var sphere = try allocator.create(ShapeSphere);
-    sphere.* = ShapeSphere{};
-    var obj = try allocator.create(JpObject);
-    var shape = try allocator.create(Shape);
-    shape.* = Shape{ .Sphere = sphere };
-    var tmatrix = try create_t_matrix();
-    obj.* = JpObject{
-        .shape = shape,
-        .object_type = JpObjectType.Implicit,
-        .tmatrix = tmatrix,
-        .object_name = name,
-    };
-    return obj;
-}
+const ShapeSphere = struct {
+    comptime object_category: JpObjectCategory = JpObjectCategory.Implicit,
+    radius: f32 = 10,
+};
 
-pub fn create_camera(name: []const u8) !*JpObject {
-    var camera = try allocator.create(ShapeCamera);
-    camera.* = ShapeCamera{};
-    var obj = try allocator.create(JpObject);
-    var shape = try allocator.create(Shape);
-    shape.* = Shape{ .Camera = camera };
-    var tmatrix = try create_t_matrix();
-    obj.* = JpObject{
-        .shape = shape,
-        .object_type = JpObjectType.Camera,
-        .tmatrix = tmatrix,
-        .object_name = name,
-    };
-    return obj;
-}
+const ShapeCamera = struct {
+    comptime object_category: JpObjectCategory = JpObjectCategory.Camera,
+    focal_length: f32 = 10,
+    field_of_view: f32 = 60,
+    direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
+};
 
-pub fn create_light_omni(name: []const u8) !*JpObject {
-    var light = try allocator.create(ShapeLightOmni);
-    light.* = ShapeLightOmni{};
-    var obj = try allocator.create(JpObject);
-    var shape = try allocator.create(Shape);
-    shape.* = Shape{ .LightOmni = light };
-    var tmatrix = try create_t_matrix();
-    obj.* = JpObject{
-        .shape = shape,
-        .object_type = JpObjectType.Light,
-        .tmatrix = tmatrix,
-        .object_name = name,
-    };
-    return obj;
-}
+const ShapeLightOmni = struct {
+    comptime object_category: JpObjectCategory = JpObjectCategory.Light,
+    color: jp_color.JpColor = jp_color.JP_COLOR_GREY,
+};
+
+// ==== HELPERS ==============================================================
 
 pub fn get_normal_at_position(obj: *JpObject, position: types.Vec3f32) types.Vec3f32 {
     var normal: types.Vec3f32 = undefined;
     switch (obj.shape.*) {
-        .Sphere => {
+        .ImplicitSphere => {
             normal = get_normal_point_at_position_sphere(obj, position);
         },
         else => unreachable,
@@ -82,46 +98,39 @@ fn get_normal_point_at_position_sphere(
     return ret;
 }
 
-pub fn delete_obj(obj: *JpObject) void {
-    switch (obj.shape.*) {
-        .Camera => allocator.destroy(obj.shape.Camera),
-        .Sphere => allocator.destroy(obj.shape.Sphere),
-        .LightOmni => allocator.destroy(obj.shape.LightOmni),
+fn shape_builder(type_id: ShapeTypeId, jp_object: *JpObject) !*Shape {
+    var shape = try allocator.create(Shape);
+    switch (type_id) {
+        // IMPLICIT ----------------------------------------------------------
+        .ImplicitSphere => {
+            var _actual_shape = try allocator.create(ShapeSphere);
+            _actual_shape.* = ShapeSphere{};
+            shape.* = Shape{ .ImplicitSphere = _actual_shape };
+            jp_object.object_category = _actual_shape.object_category;
+        },
+        // CAMERA ------------------------------------------------------------
+        .CameraPersp => {
+            var _actual_shape = try allocator.create(ShapeCamera);
+            _actual_shape.* = ShapeCamera{};
+            shape.* = Shape{ .CameraPersp = _actual_shape };
+            jp_object.object_category = _actual_shape.object_category;
+        },
+        // LIGHT -------------------------------------------------------------
+        .LightOmni => {
+            var _actual_shape = try allocator.create(ShapeLightOmni);
+            _actual_shape.* = ShapeLightOmni{};
+            shape.* = Shape{ .LightOmni = _actual_shape };
+            jp_object.object_category = _actual_shape.object_category;
+        },
     }
-    allocator.destroy(obj.tmatrix);
-    allocator.destroy(obj.shape);
-    allocator.destroy(obj);
+    return shape;
 }
 
-pub fn create_t_matrix() !*types.TMatrixf32 {
-    var m = try allocator.create([4][4]f32);
-    m.* = [_][4]f32{
-        [_]f32{ 1, 0, 0, 0 },
-        [_]f32{ 0, 1, 0, 0 },
-        [_]f32{ 0, 0, 1, 0 },
-        [_]f32{ 0, 0, 0, 1 },
-    };
-    var tmatrix = try allocator.create(types.TMatrixf32);
-    tmatrix.* = types.TMatrixf32{ .m = m.* };
-    return tmatrix;
+fn shape_deleter(jp_object: *JpObject) void {
+    switch (jp_object.shape.*) {
+        .CameraPersp => allocator.destroy(jp_object.shape.CameraPersp),
+        .ImplicitSphere => allocator.destroy(jp_object.shape.ImplicitSphere),
+        .LightOmni => allocator.destroy(jp_object.shape.LightOmni),
+    }
+    allocator.destroy(jp_object.shape);
 }
-
-pub const Shape = union(enum) {
-    Sphere: *ShapeSphere,
-    Camera: *ShapeCamera,
-    LightOmni: *ShapeLightOmni,
-};
-
-const ShapeSphere = struct {
-    radius: f32 = 10,
-};
-
-const ShapeCamera = struct {
-    focal_length: f32 = 10,
-    field_of_view: f32 = 60,
-    direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
-};
-
-const ShapeLightOmni = struct {
-    color: jp_color.JpColor = jp_color.JP_COLOR_GREY,
-};

@@ -33,11 +33,11 @@ pub const JpImg = struct {
         return img;
     }
 
-    pub fn delete(self: *Self) !void {
-        try matrix_delete_2d_f32(&self.r);
-        try matrix_delete_2d_f32(&self.g);
-        try matrix_delete_2d_f32(&self.b);
-        try matrix_delete_2d_f32(&self.a);
+    pub fn delete(self: *Self) void {
+        matrix_delete_2d_f32(&self.r);
+        matrix_delete_2d_f32(&self.g);
+        matrix_delete_2d_f32(&self.b);
+        matrix_delete_2d_f32(&self.a);
         allocator.destroy(self);
     }
 
@@ -124,7 +124,7 @@ fn matrix_create_2d_f32(x: u16, y: u16) ![][]f32 {
     return matrix;
 }
 
-fn matrix_delete_2d_f32(matrix: *[][]f32) !void {
+fn matrix_delete_2d_f32(matrix: *[][]f32) void {
     for (matrix.*) |*row| {
         allocator.free(row.*);
     }

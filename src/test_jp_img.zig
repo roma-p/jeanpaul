@@ -8,12 +8,12 @@ test "image_create_and_delete" {
     img.r[0][0] = 1;
     try std.testing.expectEqual(img.r[0][0], 1);
     try img.image_prompt_to_console();
-    try img.delete();
+    img.delete();
 }
 
 test "image_write_to_ppm_basic" {
     var img = try JpImg.new(3, 3);
     img.r[0][0] = 1;
     try img.image_write_to_ppm("image_write_to_ppm_basic.ppm");
-    try img.delete();
+    img.delete();
 }

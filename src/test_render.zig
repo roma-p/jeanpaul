@@ -6,6 +6,9 @@ const jp_color = @import("jp_color.zig");
 const jp_material = @import("jp_material.zig");
 const jp_object = @import("jp_object.zig");
 
+const JpObject = jp_object.JpObject;
+const ShapeTypeId = jp_object.ShapeTypeId;
+
 test "get_pixel_size" {
     const focal_length: f32 = 10;
     const field_of_view: f32 = 60;
@@ -14,8 +17,9 @@ test "get_pixel_size" {
 }
 
 test "get_focal_plane_center_on_valid_case" {
-    var camera = try jp_object.create_camera("camera");
-    camera.shape.Camera.focal_length = 10;
+    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+    defer camera.delete();
+    camera.shape.CameraPersp.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
@@ -28,8 +32,9 @@ test "get_focal_plane_center_on_valid_case" {
 }
 
 test "render.get_ray_direction_from_focal_plane_on_valid_case" {
-    const camera = try jp_object.create_camera("camera");
-    camera.shape.Camera.focal_length = 10;
+    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+    defer camera.delete();
+    camera.shape.CameraPersp.focal_length = 10;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
@@ -65,22 +70,25 @@ test "render.get_ray_direction_from_focal_plane_on_valid_case" {
 }
 
 test "render_one_sphere_at_center" {
-    const camera = try jp_object.create_camera("camera");
-    camera.shape.Camera.focal_length = 10;
-    camera.shape.Camera.field_of_view = 60;
+    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+    defer camera.delete();
+    camera.shape.CameraPersp.focal_length = 10;
+    camera.shape.CameraPersp.field_of_view = 60;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
         .z = -20,
     });
 
-    const sphere_1 = try jp_object.create_sphere("sphere_1");
-    sphere_1.shape.Sphere.radius = 8;
+    var sphere_1 = try JpObject.new("sphere_1", ShapeTypeId.ImplicitSphere);
+    defer sphere_1.delete();
+    sphere_1.shape.ImplicitSphere.radius = 8;
     sphere_1.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_RED,
     );
 
-    var light_1 = try jp_object.create_light_omni("light_1");
+    var light_1 = try JpObject.new("light_1", ShapeTypeId.LightOmni);
+    defer light_1.delete();
     light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
     try light_1.tmatrix.set_position(&types.Vec3f32{
         .x = 20,
@@ -97,23 +105,26 @@ test "render_one_sphere_at_center" {
 }
 
 test "render_two_sphere_at_center" {
-    const camera = try jp_object.create_camera("camera");
-    camera.shape.Camera.focal_length = 10;
-    camera.shape.Camera.field_of_view = 70;
+    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+    defer camera.delete();
+    camera.shape.CameraPersp.focal_length = 10;
+    camera.shape.CameraPersp.field_of_view = 70;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
         .z = -30,
     });
 
-    const sphere_1 = try jp_object.create_sphere("sphere_1");
-    sphere_1.shape.Sphere.radius = 7;
+    var sphere_1 = try JpObject.new("sphere_1", ShapeTypeId.ImplicitSphere);
+    defer sphere_1.delete();
+    sphere_1.shape.ImplicitSphere.radius = 7;
     sphere_1.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_RED,
     );
 
-    const sphere_2 = try jp_object.create_sphere("sphere_2");
-    sphere_2.shape.Sphere.radius = 8;
+    var sphere_2 = try JpObject.new("sphere_2", ShapeTypeId.ImplicitSphere);
+    defer sphere_2.delete();
+    sphere_2.shape.ImplicitSphere.radius = 8;
     sphere_2.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_BLUE,
     );
@@ -123,7 +134,8 @@ test "render_two_sphere_at_center" {
         .z = -2,
     });
 
-    var light_1 = try jp_object.create_light_omni("light_1");
+    var light_1 = try JpObject.new("light_1", ShapeTypeId.LightOmni);
+    defer light_1.delete();
     light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
     try light_1.tmatrix.set_position(&types.Vec3f32{
         .x = 20,
@@ -140,17 +152,19 @@ test "render_two_sphere_at_center" {
     try render.render_to_path(camera, scene, "render_two_sphere_at_center.ppm");
 }
 test "render_two_sphere_distanced" {
-    const camera = try jp_object.create_camera("camera");
-    camera.shape.Camera.focal_length = 10;
-    camera.shape.Camera.field_of_view = 70;
+    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+    defer camera.delete();
+    camera.shape.CameraPersp.focal_length = 10;
+    camera.shape.CameraPersp.field_of_view = 70;
     try camera.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
         .y = 0,
         .z = -30,
     });
 
-    const sphere_1 = try jp_object.create_sphere("sphere_1");
-    sphere_1.shape.Sphere.radius = 7;
+    var sphere_1 = try JpObject.new("sphere_1", ShapeTypeId.ImplicitSphere);
+    defer sphere_1.delete();
+    sphere_1.shape.ImplicitSphere.radius = 7;
     sphere_1.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_RED,
     );
@@ -160,8 +174,9 @@ test "render_two_sphere_distanced" {
         .z = 0,
     });
 
-    const sphere_2 = try jp_object.create_sphere("sphere_2");
-    sphere_2.shape.Sphere.radius = 6;
+    var sphere_2 = try JpObject.new("sphere_2", ShapeTypeId.ImplicitSphere);
+    defer sphere_2.delete();
+    sphere_2.shape.ImplicitSphere.radius = 6;
     sphere_2.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_BLUE,
     );
@@ -171,7 +186,8 @@ test "render_two_sphere_distanced" {
         .z = 0,
     });
 
-    var light_1 = try jp_object.create_light_omni("light_1");
+    var light_1 = try JpObject.new("light_1", ShapeTypeId.LightOmni);
+    defer light_1.delete();
     light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
     try light_1.tmatrix.set_position(&types.Vec3f32{
         .x = 0,
