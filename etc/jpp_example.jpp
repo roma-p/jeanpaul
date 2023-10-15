@@ -3,7 +3,7 @@
 
 scene
 {
-  resolution ! V 1 2
+  resolution ! V 2
   1920 1080
   camera "camera/name"
 }
