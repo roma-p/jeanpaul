@@ -127,21 +127,35 @@ const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
 
 pub const JP_EPSILON = 0.000001;
 
-// ==== HELPERS ==============================================================
+// ==== RUN TIME RAW MATRIX / VECTOR =========================================
 
-pub fn cast_u16_to_f32(input: u16) f32 {
-    // didn't find how to do this directly without casting as int first...
-    // used mainly to go from screen space (2d u16 array) to 3d space (3d f32 array)
-    const tmp: i32 = input;
-    const ret: f32 = @floatFromInt(tmp);
-    return ret;
+// --> f32 matrix
+
+pub fn matrix_f32_create(x: u16, y: u16) ![][]f32 {
+    var matrix: [][]f32 = try allocator.alloc([]f32, x);
+    for (matrix) |*row| {
+        row.* = try allocator.alloc(f32, y);
+        for (row.*, 0..) |_, i| {
+            row.*[i] = 0;
+        }
+    }
+    return matrix;
 }
 
-pub fn absolute(number: f32) f32 {
-    // didn't succeeded to make "@abs" builtin work so reimplementing it...
-    if (number >= 0) {
-        return number;
-    } else {
-        return number + 2 * number;
+pub fn matrix_f32_delete(matrix: *[][]f32) void {
+    for (matrix.*) |*row| {
+        allocator.free(row.*);
     }
+    allocator.free(matrix.*);
+}
+
+// --> f32 vector
+
+pub fn vector_f32_create(size: u16) ![]f32 {
+    var matrix: []f32 = try allocator.alloc(f32, size);
+    return matrix;
+}
+
+pub fn vector_f32_delete(vector: *[]f32) void {
+    allocator.free(vector.*);
 }

@@ -25,19 +25,19 @@ pub const JpImg = struct {
         img.* = JpImg{
             .width = width,
             .height = height,
-            .r = try matrix_create_2d_f32(width, height),
-            .g = try matrix_create_2d_f32(width, height),
-            .b = try matrix_create_2d_f32(width, height),
-            .a = try matrix_create_2d_f32(width, height),
+            .r = try types.matrix_f32_create(width, height),
+            .g = try types.matrix_f32_create(width, height),
+            .b = try types.matrix_f32_create(width, height),
+            .a = try types.matrix_f32_create(width, height),
         };
         return img;
     }
 
     pub fn delete(self: *Self) void {
-        matrix_delete_2d_f32(&self.r);
-        matrix_delete_2d_f32(&self.g);
-        matrix_delete_2d_f32(&self.b);
-        matrix_delete_2d_f32(&self.a);
+        types.matrix_f32_delete(&self.r);
+        types.matrix_f32_delete(&self.g);
+        types.matrix_f32_delete(&self.b);
+        types.matrix_f32_delete(&self.a);
         allocator.destroy(self);
     }
 
@@ -112,21 +112,3 @@ pub const JpImg = struct {
         self.b[x][y] = color.b;
     }
 };
-
-fn matrix_create_2d_f32(x: u16, y: u16) ![][]f32 {
-    var matrix: [][]f32 = try allocator.alloc([]f32, x);
-    for (matrix) |*row| {
-        row.* = try allocator.alloc(f32, y);
-        for (row.*, 0..) |_, i| {
-            row.*[i] = 0;
-        }
-    }
-    return matrix;
-}
-
-fn matrix_delete_2d_f32(matrix: *[][]f32) void {
-    for (matrix.*) |*row| {
-        allocator.free(row.*);
-    }
-    allocator.free(matrix.*);
-}

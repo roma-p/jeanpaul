@@ -45,7 +45,7 @@ pub const JpObject = struct {
             .tmatrix = tmatrix,
             .object_name = name,
         };
-        obj.shape = try shape_builder(shape_type_id, obj);
+        try shape_builder(shape_type_id, obj);
         return obj;
     }
 
@@ -98,7 +98,7 @@ fn get_normal_point_at_position_sphere(
     return ret;
 }
 
-fn shape_builder(type_id: ShapeTypeId, jp_object: *JpObject) !*Shape {
+fn shape_builder(type_id: ShapeTypeId, jp_object: *JpObject) !void {
     var shape = try allocator.create(Shape);
     switch (type_id) {
         // IMPLICIT ----------------------------------------------------------
@@ -123,7 +123,7 @@ fn shape_builder(type_id: ShapeTypeId, jp_object: *JpObject) !*Shape {
             jp_object.object_category = _actual_shape.object_category;
         },
     }
-    return shape;
+    jp_object.shape = shape;
 }
 
 fn shape_deleter(jp_object: *JpObject) void {
