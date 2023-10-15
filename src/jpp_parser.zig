@@ -9,6 +9,8 @@ const zig_utils = @import("zig_utils.zig");
 
 pub const ErrorParsingJPP = error{ ParsingError, ExpetedNumber };
 
+// ==== PARSING OBJECT =======================================================
+
 const ParsingState = enum {
     ParsingEntityType,
     ParsingSectionStart,
@@ -33,7 +35,9 @@ pub const JppParser = struct {
     pub fn parse(file_path: []const u8) !void {
 
         // instiating self.
-        var parsing_section_list = try std.ArrayList(*ParsingSection).initCapacity(allocator, 5);
+        var parsing_section_list = try std.ArrayList(
+            *ParsingSection,
+        ).initCapacity(allocator, 5);
         defer parsing_section_list.deinit();
 
         var self = try allocator.create(Self);
@@ -83,7 +87,11 @@ pub const JppParser = struct {
     fn state_ParsingEntityType(self: *Self) !void {
         var words = std.mem.split(u8, self.i_line, " ");
 
-        const current_section_name = words.next() orelse "";
+        const current_section_name = words.next() orelse {
+            var err_str = "expecting section name definition, find nothing.";
+            self.exit_state_in_err(err_str);
+            return;
+        };
         if (words.next() != null) {
             var err_str = "expecting section name definition (one word)";
             self.exit_state_in_err(err_str);
@@ -117,6 +125,7 @@ pub const JppParser = struct {
         if (std.mem.eql(u8, self.i_line, jpp_format.SYMBOL_SECTION_END)) {
             try self.parsing_section_list.append(self.i_current_section);
             self.i_state = ParsingState.ParsingEntityType;
+            return;
         }
 
         // 2 => getting property name, property value.
@@ -178,6 +187,7 @@ pub const JppParser = struct {
                 property_name,
                 property_value,
             );
+            return;
         }
         // 4.2 => second word is a string.
         const property_value = try self.conv_word_to_f32(second_word) orelse return;
@@ -213,6 +223,7 @@ pub const JppParser = struct {
         var words = std.mem.split(u8, self.i_line, " ");
         const x_max = self.i_current_property.value.Matrix.x_size;
         const y_current = self.i_current_matrix_y_idx;
+
         var x_current: u16 = 0;
         while (x_current < x_max) : (x_current += 1) {
             const number = try self.conv_word_to_f32(words.next()) orelse return;
@@ -227,7 +238,8 @@ pub const JppParser = struct {
             defer allocator.free(err_str);
             self.exit_state_in_err(err_str);
         }
-        if (y_current <= self.i_current_property.value.Matrix.y_size) return;
+        self.i_current_matrix_y_idx += 1;
+        if (y_current < self.i_current_property.value.Matrix.y_size - 1) return;
 
         self.i_state = ParsingState.ParsingSectionProperty;
         try self.i_current_section.property_list.append(self.i_current_property);
@@ -273,6 +285,10 @@ pub const JppParser = struct {
     // ---- PARSING HELPERS --------------------------------------------------
 
     fn check_name_correct(self: *Self, name: []const u8) !bool {
+        if (name.len == 0) {
+            self.exit_state_in_err("expecting string, find nothing");
+            return false;
+        }
         const ret = std.ascii.isAlphabetic(name[0]);
         // TODO: other check?
         if (ret == false) {
@@ -303,7 +319,7 @@ pub const JppParser = struct {
         const ret = std.fmt.parseInt(u16, non_null_word, 10) catch {
             var err_str = try std.fmt.allocPrint(
                 allocator,
-                "expecting integer, find {s}",
+                "expecting integer, find '{s}'",
                 .{non_null_word},
             );
             defer allocator.free(err_str);
@@ -322,7 +338,7 @@ pub const JppParser = struct {
         const ret = std.fmt.parseFloat(f32, non_null_word) catch {
             var err_str = try std.fmt.allocPrint(
                 allocator,
-                "expecting float, find {s}",
+                "expecting float, find '{s}'",
                 .{non_null_word},
             );
             defer allocator.free(err_str);
@@ -332,6 +348,8 @@ pub const JppParser = struct {
         return ret;
     }
 };
+
+// ==== PARSING SECTION DTO ==================================================
 
 const ParsingSection = struct {
     section_type_name: []const u8 = undefined,
@@ -343,12 +361,15 @@ const ParsingSection = struct {
         var instance = try allocator.create(Self);
         instance.* = Self{
             .section_type_name = section_type_name,
-            .property_list = try std.ArrayList(*ParsingProperty).initCapacity(allocator, 5),
+            .property_list = try std.ArrayList(
+                *ParsingProperty,
+            ).initCapacity(allocator, 5),
         };
         return instance;
     }
 
     pub fn delete(self: *Self) void {
+        // FIXME: delete properties !!!!
         self.property_list.deinit();
         allocator.destroy(self);
     }

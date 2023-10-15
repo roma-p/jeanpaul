@@ -3,6 +3,7 @@ const allocator = std.heap.page_allocator;
 const stdout = std.io.getStdOut().writer();
 
 const types = @import("types.zig");
+const zig_utils = @import("zig_utils.zig");
 const jp_img = @import("jp_img.zig");
 const jp_ray = @import("jp_ray.zig");
 const jp_scene = @import("jp_scene.zig");
@@ -31,8 +32,8 @@ pub fn render(
     const focal_center = get_focal_plane_center(camera);
     const camera_position = camera.tmatrix.get_position();
 
-    const img_width: f32 = types.cast_u16_to_f32(img.*.width);
-    const img_height: f32 = types.cast_u16_to_f32(img.*.height);
+    const img_width: f32 = zig_utils.cast_u16_to_f32(img.*.width);
+    const img_height: f32 = zig_utils.cast_u16_to_f32(img.*.height);
 
     const pixel_size = try get_pixel_size(
         camera.shape.CameraPersp.focal_length,
@@ -52,8 +53,8 @@ pub fn render(
                 img_width,
                 img_height,
                 pixel_size,
-                types.cast_u16_to_f32(_x),
-                types.cast_u16_to_f32(_y),
+                zig_utils.cast_u16_to_f32(_x),
+                zig_utils.cast_u16_to_f32(_y),
             );
             var _intersection: jp_ray.JpRayIntersection = undefined;
             var _intersect_one_obj = try jp_ray.shot_ray(
