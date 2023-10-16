@@ -116,6 +116,15 @@ pub const TMatrixf32 = struct {
         self.m[1][3] += position.y;
         self.m[2][3] += position.z;
     }
+
+    pub fn multiply_with_vec3(self: *const TMatrixf32, vector: *Vec3f32) Vec3f32 {
+        //FIXME: is thois correct x or y inversed or what?
+        return Vec3f32{
+            .x = self.m[0][0] * vector.x + self.m[0][1] * vector.y + self.m[0][2] * vector.z,
+            .y = self.m[1][0] * vector.x + self.m[1][1] * vector.y + self.m[1][2] * vector.z,
+            .z = self.m[2][0] * vector.x + self.m[2][1] * vector.y + self.m[2][2] * vector.z,
+        };
+    }
 };
 
 const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
