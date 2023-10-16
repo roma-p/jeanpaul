@@ -31,7 +31,7 @@ pub fn render_lambert(
         }
 
         _ = normal;
-        light_color = light_color.sum_color(material.mat.Lambert.diffuse);
+        light_color = light_color.sum_color(material.mat.Lambert.kd_color);
 
         // const vector_to_light_normalised = vector_to_light.normalize();
         // const attenuation_factor = vector_to_light_normalised.product_dot(&normal);

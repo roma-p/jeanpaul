@@ -48,13 +48,15 @@ pub const JpMaterial = struct {
 // ==== Material Definition ==================================================
 
 pub const MatLambert = struct {
-    diffuse: jp_color.JpColor = jp_color.JP_COLOR_DEFAULT,
+    kd_color: jp_color.JpColor = jp_color.JP_COLOR_DEFAULT,
+    //FIXME: kd_intensity not used!
+    kd_intensity: f32 = 0.7,
 };
 
 // ==== HELPERS ==============================================================
 
 pub fn create_default_colored_material(color: jp_color.JpColor) !*JpMaterial {
     var material = try JpMaterial.new("default", MaterialTypeId.Lambert);
-    material.mat.Lambert.diffuse = color;
+    material.mat.Lambert.kd_color = color;
     return material;
 }
