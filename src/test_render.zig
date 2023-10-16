@@ -196,7 +196,7 @@ test "render_two_sphere_distanced" {
     });
 
     var scene = try jp_scene.JpScene.new();
-    scene.resolution = types.Vec2u16{ .x = 1024, .y = 1024 };
+    scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
     try scene.add_light(light_1);

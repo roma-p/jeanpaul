@@ -16,7 +16,7 @@ field_of_view 60
 tmatrix ! M 4 4
 1 0 0 0
 0 1 0 0
-0 0 1 0
+0 0 1
 0 0 0 1
 }
 

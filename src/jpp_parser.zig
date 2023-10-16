@@ -84,6 +84,7 @@ pub const JppParser = struct {
 
     // ---- STATES -----------------------------------------------------------
 
+    // ==> ParsingEntityType -------------------------------------------------
     fn state_ParsingEntityType(self: *Self) !void {
         var words = std.mem.split(u8, self.i_line, " ");
 
@@ -106,6 +107,7 @@ pub const JppParser = struct {
         self.i_state = ParsingState.ParsingSectionStart;
     }
 
+    // ==> ParsingSectionStart -----------------------------------------------
     fn state_ParsingSectionStart(self: *Self) !void {
         if (!std.mem.eql(u8, self.i_line, jpp_format.SYMBOL_SECTION_BEGIN)) {
             var err_str = try std.fmt.allocPrint(
@@ -119,6 +121,7 @@ pub const JppParser = struct {
         self.i_state = ParsingState.ParsingSectionProperty;
     }
 
+    // ==> ParsingSectionProperty --------------------------------------------
     fn state_ParsingSectionProperty(self: *Self) !void {
 
         // 1 => if section definition finished
@@ -198,6 +201,7 @@ pub const JppParser = struct {
         try self.i_current_section.property_list.append(self.i_current_property);
     }
 
+    // ==> ParsingVector -----------------------------------------------------
     fn state_ParsingVector(self: *Self) !void {
         var i: u16 = 0;
         var words = std.mem.split(u8, self.i_line, " ");
@@ -219,6 +223,7 @@ pub const JppParser = struct {
         try self.i_current_section.property_list.append(self.i_current_property);
     }
 
+    // ==> ParsingVector -----------------------------------------------------
     fn state_ParsingMatrix(self: *Self) !void {
         var words = std.mem.split(u8, self.i_line, " ");
         const x_max = self.i_current_property.value.Matrix.x_size;
@@ -252,7 +257,10 @@ pub const JppParser = struct {
     ) ?void {
         const size = self.conv_word_to_u16(size_as_str) catch return null;
         self.i_state = ParsingState.ParsingVector;
-        self.i_current_property = ParsingProperty.new_vector(property_name, size orelse 0) catch return null;
+        self.i_current_property = ParsingProperty.new_vector(
+            property_name,
+            size orelse 0,
+        ) catch return null;
     }
 
     fn parsing_matrix_header(
@@ -476,7 +484,3 @@ const ParsingPropertyVector = struct {
         allocator.destroy(self);
     }
 };
-
-test "working" {
-    try JppParser.parse("etc/jpp_example.jpp");
-}

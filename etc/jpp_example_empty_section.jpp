@@ -1,0 +1,23 @@
+### Some info to be skipped.
+### Some more.
+
+scene
+{
+}
+
+camera.persp
+{
+}
+
+implicit.sphere
+{
+}
+
+light.omni
+{
+}
+
+# com to skip...
+material.Lambert
+{
+}

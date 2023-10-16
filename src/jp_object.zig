@@ -74,6 +74,7 @@ const ShapeCamera = struct {
 const ShapeLightOmni = struct {
     comptime object_category: JpObjectCategory = JpObjectCategory.Light,
     color: jp_color.JpColor = jp_color.JP_COLOR_GREY,
+    intensity: f32 = 0.7,
 };
 
 // ==== HELPERS ==============================================================

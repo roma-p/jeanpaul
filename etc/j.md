@@ -1,4 +1,16 @@
 
+Maintenant que la partie "parser" est censée fonctionner...
+- 1 zigligs du début à la fin...
+- 2 ajouter test Us avec fichier mal formatté -> erreur de parser à detecter!
+- 3 modifier les shapes comme ds l'exemple...
+- 4 detecter direction de la camera à partir de la matrice de transformation: (-1 x tmatrix)
+- 5 revoir le system de materiaux? 
+- 5 ajouter build de scene dans le parser. (implique surement bcp de saloperies...)
+- 6 ajouter une cli basic... wala jpp scene.jpp picture.ppm
+- 7 finalement débug: les axes d'images, x,y,z ... ET FINALEMENT AVANCER....
+
+-----
+
 - objectType -> category
 - add type and hashmap to str to hasmap
 - add object contructor generic (get rid of 'create_sphere' ... -> will be in scene.
