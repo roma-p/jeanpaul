@@ -5,7 +5,7 @@ const jp_object = @import("jp_object.zig");
 const jp_scene = @import("jp_scene.zig");
 const allocator = std.heap.page_allocator;
 
-pub const JpRayIntersection = struct {
+pub const JpRayHit = struct {
     object: *jp_object.JpObject,
     position: types.Vec3f32,
     distance: f32,
@@ -25,11 +25,17 @@ pub const JpRayIntersection = struct {
     pub fn delete(self: *Self) void {
         allocator.destroy(self);
     }
+
+    pub fn reset(self: *Self) void {
+        self.object = undefined;
+        self.position = undefined;
+        self.distance = undefined;
+    }
 };
 
 pub fn shot_ray(
     origin_position: types.Vec3f32,
-    intersection: *JpRayIntersection,
+    intersection: *JpRayHit,
     ray_direction: types.Vec3f32,
     scene: *jp_scene.JpScene,
 ) !bool {
@@ -42,12 +48,17 @@ pub fn shot_ray(
 
     for (scene.objects.items) |obj| {
         var does_intersect: bool = undefined;
-        if (obj.object_category == jp_object.JpObjectCategory.Mesh) {
-            unreachable;
+
+        switch (obj.object_category) {
+            .Camera => continue,
+            .Mesh => unreachable, // not implemented but shall be...
+            .Light => continue,
+            else => {},
         }
+
         switch (obj.shape.*) {
             .ImplicitSphere => {
-                does_intersect = try check_ray_intersect_with_sphere(
+                does_intersect = try check_ray_hit_implicit_sphere(
                     ray_direction,
                     _shift_origin_position,
                     obj.tmatrix.get_position(),
@@ -55,6 +66,7 @@ pub fn shot_ray(
                     &_t_current,
                 );
             },
+            // .LightOmni => unreachable,
             else => {
                 unreachable;
             },
@@ -73,7 +85,7 @@ pub fn shot_ray(
         return false;
     }
 
-    intersection.* = JpRayIntersection{
+    intersection.* = JpRayHit{
         .object = &_intersect_object,
         .position = ray_direction.product_scalar(_t_min).sum_vector(
             &_shift_origin_position,
@@ -84,7 +96,7 @@ pub fn shot_ray(
     return true;
 }
 
-pub fn check_ray_intersect_with_sphere(
+pub fn check_ray_hit_implicit_sphere(
     ray_direction: types.Vec3f32,
     ray_origin: types.Vec3f32,
     sphere_position: types.Vec3f32,
@@ -121,4 +133,18 @@ pub fn check_ray_intersect_with_sphere(
 
     intersect_ray_multiplier.* = t;
     return true;
+}
+
+pub fn check_ray_hit_implicit_light(
+    ray_direction: types.Vec3f32,
+    ray_origin: types.Vec3f32,
+    sphere_position: types.Vec3f32,
+    sphere_radius: f32,
+    intersect_ray_multiplier: *f32,
+) !bool {
+    _ = ray_direction;
+    _ = ray_origin;
+    _ = sphere_position;
+    _ = sphere_radius;
+    _ = intersect_ray_multiplier;
 }

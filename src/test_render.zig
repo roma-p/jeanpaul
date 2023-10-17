@@ -70,8 +70,10 @@ test "render.get_ray_direction_from_focal_plane_on_valid_case" {
 }
 
 test "render_one_sphere_at_center" {
-    var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
-    defer camera.delete();
+    var scene = try jp_scene.JpScene.new();
+
+    var camera = try scene.create_object("camera", ShapeTypeId.CameraPersp);
+    defer scene.delete_object(camera);
     camera.shape.CameraPersp.focal_length = 10;
     camera.shape.CameraPersp.field_of_view = 60;
     try camera.tmatrix.set_position(&types.Vec3f32{
@@ -80,15 +82,15 @@ test "render_one_sphere_at_center" {
         .z = -20,
     });
 
-    var sphere_1 = try JpObject.new("sphere_1", ShapeTypeId.ImplicitSphere);
-    defer sphere_1.delete();
+    var sphere_1 = try scene.create_object("sphere_1", ShapeTypeId.ImplicitSphere);
+    defer scene.delete_object(sphere_1);
     sphere_1.shape.ImplicitSphere.radius = 8;
     sphere_1.material = try jp_material.create_default_colored_material(
         jp_color.JP_COLOR_RED,
     );
 
-    var light_1 = try JpObject.new("light_1", ShapeTypeId.LightOmni);
-    defer light_1.delete();
+    var light_1 = try scene.create_object("light_1", ShapeTypeId.LightOmni);
+    defer scene.delete_object(light_1);
     light_1.shape.LightOmni.color = jp_color.JP_COLOR_WHITE;
     try light_1.tmatrix.set_position(&types.Vec3f32{
         .x = 20,
@@ -96,10 +98,7 @@ test "render_one_sphere_at_center" {
         .z = -15,
     });
 
-    var scene = try jp_scene.JpScene.new();
     scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
-    try scene.add_object(sphere_1);
-    try scene.add_light(light_1);
 
     try render.render_to_path(camera, scene, "render_one_sphere_at_center.ppm");
 }
@@ -147,7 +146,7 @@ test "render_two_sphere_at_center" {
     scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
-    try scene.add_light(light_1);
+    try scene.add_object(light_1);
 
     try render.render_to_path(camera, scene, "render_two_sphere_at_center.ppm");
 }
@@ -199,7 +198,7 @@ test "render_two_sphere_distanced" {
     scene.resolution = types.Vec2u16{ .x = 256, .y = 256 };
     try scene.add_object(sphere_1);
     try scene.add_object(sphere_2);
-    try scene.add_light(light_1);
+    try scene.add_object(light_1);
 
     try render.render_to_path(camera, scene, "render_two_sphere_distanced.ppm");
 }

@@ -22,6 +22,8 @@ pub const JpImg = struct {
     //  * -> x
     pub fn new(width: u16, height: u16) !*JpImg {
         const img = try allocator.create(JpImg);
+        errdefer allocator.destroy(img);
+
         img.* = JpImg{
             .width = width,
             .height = height,

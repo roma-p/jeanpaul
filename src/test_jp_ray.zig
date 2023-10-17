@@ -7,7 +7,7 @@ const jp_ray = @import("jp_ray.zig");
 const JpObject = jp_object.JpObject;
 const ShapeTypeId = jp_object.ShapeTypeId;
 
-test "render.check_ray_intersect_with_sphere_basic_test" {
+test "render.check_ray_hit_implicit_sphere_basic_test" {
     var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
     defer camera.delete();
     camera.shape.CameraPersp.focal_length = 10;
@@ -32,7 +32,7 @@ test "render.check_ray_intersect_with_sphere_basic_test" {
         0,
         0,
     );
-    const intersect_1 = try jp_ray.check_ray_intersect_with_sphere(
+    const intersect_1 = try jp_ray.check_ray_hit_implicit_sphere(
         ray_direction_1,
         camera.tmatrix.get_position(),
         sphere_position,
@@ -50,7 +50,7 @@ test "render.check_ray_intersect_with_sphere_basic_test" {
         15,
         15,
     );
-    const intersect_2 = try jp_ray.check_ray_intersect_with_sphere(
+    const intersect_2 = try jp_ray.check_ray_hit_implicit_sphere(
         ray_direction_2,
         camera.tmatrix.get_position(),
         sphere_position,
@@ -68,7 +68,7 @@ test "render.check_ray_intersect_with_sphere_basic_test" {
         29,
         29,
     );
-    const intersect_3 = try jp_ray.check_ray_intersect_with_sphere(
+    const intersect_3 = try jp_ray.check_ray_hit_implicit_sphere(
         ray_direction_3,
         camera.tmatrix.get_position(),
         sphere_position,

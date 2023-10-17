@@ -23,10 +23,16 @@ pub const JpMaterial = struct {
 
     pub fn new(name: []const u8, material_type_id: MaterialTypeId) !*Self {
         var jpmat = try allocator.create(Self);
+        errdefer allocator.destroy(jpmat);
+
         var mat = try allocator.create(Material);
+        errdefer allocator.destroy(mat);
+
         switch (material_type_id) {
             .Lambert => {
                 var actual_mat = try allocator.create(MatLambert);
+                errdefer allocator.destroy(actual_mat);
+
                 actual_mat.* = MatLambert{};
                 mat.* = Material{ .Lambert = actual_mat };
             },

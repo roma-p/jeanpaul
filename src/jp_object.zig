@@ -32,18 +32,22 @@ pub const JpObject = struct {
     material: *jp_material.JpMaterial = undefined,
     shape: *Shape = undefined,
     object_category: JpObjectCategory,
-    object_name: []const u8,
+    name: []const u8,
 
     const Self = @This();
 
     pub fn new(name: []const u8, shape_type_id: ShapeTypeId) !*Self {
         var tmatrix = try types.TMatrixf32.new();
+        errdefer tmatrix.delete();
+
         var obj = try allocator.create(JpObject);
+        errdefer obj.delete();
+
         obj.* = JpObject{
             .shape = undefined,
             .object_category = undefined, // set by builder
             .tmatrix = tmatrix,
-            .object_name = name,
+            .name = name,
         };
         try shape_builder(shape_type_id, obj);
         return obj;
@@ -66,8 +70,15 @@ const ShapeSphere = struct {
 
 const ShapeCamera = struct {
     comptime object_category: JpObjectCategory = JpObjectCategory.Camera,
+    comptime DIRECTION: types.Vec3f32 = types.Vec3f32{
+        .x = 0,
+        .y = 0,
+        .z = 1,
+    },
     focal_length: f32 = 10,
     field_of_view: f32 = 60,
+    //FIXME: delme -> use DIRECTION instead!
+    //FIXME: default direction is generally: 0, 0, -1
     direction: types.Vec3f32 = types.Vec3f32{ .x = 0, .y = 0, .z = 1 },
 };
 

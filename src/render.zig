@@ -56,33 +56,33 @@ pub fn render(
                 zig_utils.cast_u16_to_f32(_x),
                 zig_utils.cast_u16_to_f32(_y),
             );
-            var _intersection: jp_ray.JpRayIntersection = undefined;
+            var _hit: jp_ray.JpRayHit = undefined;
             var _intersect_one_obj = try jp_ray.shot_ray(
                 camera_position,
-                &_intersection,
+                &_hit,
                 _ray_direction,
                 scene,
             );
             if (_intersect_one_obj == false) {
-                _intersection = undefined;
+                _hit = undefined;
                 continue;
             }
 
-            var object: jp_object.JpObject = _intersection.object.*;
-            const position: types.Vec3f32 = _intersection.position;
+            var object: jp_object.JpObject = _hit.object.*;
+            const position: types.Vec3f32 = _hit.position;
             const normal = jp_object.get_normal_at_position(&object, position);
 
             var color_at_px: jp_color.JpColor = undefined;
-            switch (_intersection.object.material.mat.*) {
-                .Lambert => color_at_px = render_shader.render_lambert(
-                    _intersection.position,
+            switch (_hit.object.material.mat.*) {
+                .Lambert => color_at_px = try render_shader.render_lambert(
+                    _hit.position,
                     normal,
                     object.material,
                     scene,
                 ),
             }
             try img.image_draw_at_px(_x, _y, color_at_px);
-            _intersection = undefined;
+            _hit = undefined;
             color_at_px = undefined;
         }
     }
@@ -126,9 +126,22 @@ pub fn get_ray_direction_from_focal_plane(
 
 pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
     // camera.pos + camera.direction * focal_length
+
+    // TODO: TEST ME!
+    // const camera_direction = get_camera_direction(camera);
+    // var weighted_direction = camera_direction.product_scalar(
+    //     camera.shape.CameraPersp.focal_length,
+    // );
+
     var weighted_direction = camera.shape.CameraPersp.direction.product_scalar(
         camera.shape.CameraPersp.focal_length,
     );
     var position = camera.tmatrix.get_position();
     return position.sum_vector(&weighted_direction);
+}
+
+pub fn get_camera_direction(camera: *const jp_object.JpObject) types.Vec3f32 {
+    return camera.tmatrix.multiply_with_vec3(
+        camera.shape.CameraPersp.DIRECTION,
+    ).normalize();
 }

@@ -11,22 +11,26 @@ pub fn render_lambert(
     normal: types.Vec3f32,
     material: *jp_material.JpMaterial,
     scene: *jp_scene.JpScene,
-) jp_color.JpColor {
+) !jp_color.JpColor {
     var light_color = jp_color.JpColor{ .r = 0, .g = 0, .b = 0 };
-    for (scene.lights.items) |light| {
+    var hit = try jp_ray.JpRayHit.new();
+    defer hit.delete();
+    for (scene.objects.items) |light| {
+        defer hit.reset();
+        if (light.object_category != jp_object.JpObjectCategory.Light) continue;
+
         const vector_to_light: types.Vec3f32 = light.tmatrix.get_position().substract_vector(
             &position,
         );
 
-        var intersection: jp_ray.JpRayIntersection = undefined;
         const does_intersect = try jp_ray.shot_ray(
             position,
-            &intersection,
+            hit,
             vector_to_light,
             scene,
         );
 
-        if (does_intersect and intersection.distance < 0) {
+        if (does_intersect and hit.distance < 0) {
             continue;
         }
 
@@ -41,7 +45,6 @@ pub fn render_lambert(
         // single_light_contribution = single_light_contribution.multiply(attenuation_factor);
         // light_color = light_color.sum_color(single_light_contribution);
 
-        intersection = undefined;
     }
     return light_color;
 }
