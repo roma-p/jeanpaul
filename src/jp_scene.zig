@@ -23,6 +23,8 @@ pub const JpScene = struct {
 
     const Self = @This();
 
+    // CONSTRUCTOR DESTRUCTOR ------------------------------------------------
+
     pub fn new() !*Self {
         var scene = try allocator.create(Self);
         scene.* = JpScene{
@@ -39,10 +41,7 @@ pub const JpScene = struct {
         allocator.destroy(self);
     }
 
-    pub fn add_object(self: *Self, obj: *jp_object.JpObject) !void {
-        if (!self._check_object_name_free(obj.name)) return JpSceneError.NameNotAvailable;
-        self.objects.append(obj) catch return JpSceneError.AllocationError;
-    }
+    // OBJETS MANAGEMENT -----------------------------------------------------
 
     pub fn create_object(
         self: *Self,
@@ -58,6 +57,11 @@ pub const JpScene = struct {
         return object;
     }
 
+    pub fn add_object(self: *Self, obj: *jp_object.JpObject) !void {
+        if (!self._check_object_name_free(obj.name)) return JpSceneError.NameNotAvailable;
+        self.objects.append(obj) catch return JpSceneError.AllocationError;
+    }
+
     pub fn delete_object(self: *Self, obj: *jp_object.JpObject) void {
         for (self.objects.items, 0..) |o, i| {
             if (o == obj) {
@@ -68,10 +72,16 @@ pub const JpScene = struct {
         }
     }
 
-    pub fn add_material(self: *Self, material: *jp_material.JpMaterial) JpSceneError!void {
-        if (!self._check_material_name_free(material.name)) return JpSceneError.NameNotAvailable;
-        self.materials.append(material) catch return JpSceneError.AllocationError;
+    pub fn get_object(self: *Self, name: []const u8) JpSceneError!*jp_object.JpObject {
+        for (self.objets.items) |o| {
+            if (std.mem.eql(u8, o.name, name)) {
+                return o;
+            }
+        }
+        return JpSceneError.ObjectNotFound;
     }
+
+    // MATERIAL MANAGEMENT ---------------------------------------------------
 
     pub fn create_material(
         self: *Self,
@@ -90,6 +100,11 @@ pub const JpScene = struct {
         return material;
     }
 
+    pub fn add_material(self: *Self, material: *jp_material.JpMaterial) JpSceneError!void {
+        if (!self._check_material_name_free(material.name)) return JpSceneError.NameNotAvailable;
+        self.materials.append(material) catch return JpSceneError.AllocationError;
+    }
+
     pub fn delete_material(self: *Self, material: *jp_material.JpMaterial) void {
         for (self.materials.items, 0..) |m, i| {
             if (m == material) {
@@ -99,6 +114,17 @@ pub const JpScene = struct {
             }
         }
     }
+
+    pub fn get_material(self: *Self, name: []const u8) JpSceneError!*jp_material.JpMaterial {
+        for (self.materials.items) |m| {
+            if (std.mem.eql(u8, m.name, name)) {
+                return m;
+            }
+        }
+        return JpSceneError.MaterialNotFound;
+    }
+
+    // PRIVATE ---------------------------------------------------------------
 
     fn _check_material_name_free(self: *Self, name: []const u8) bool {
         for (self.materials.items) |mat| {
