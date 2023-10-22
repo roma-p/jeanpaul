@@ -9,7 +9,7 @@ pub const MaterialTypeId = enum {
     Lambert,
 };
 
-const Material = union(enum) {
+const Material = union(MaterialTypeId) {
     Lambert: *MatLambert,
 };
 

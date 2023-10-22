@@ -19,7 +19,7 @@ pub const JpObjectCategory = enum {
     Implicit,
 };
 
-pub const Shape = union(enum) {
+pub const Shape = union(ShapeTypeId) {
     ImplicitSphere: *ShapeSphere,
     CameraPersp: *ShapeCamera,
     LightOmni: *ShapeLightOmni,
