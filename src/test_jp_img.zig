@@ -12,7 +12,7 @@ test "image_create_and_delete" {
 }
 
 test "image_write_to_ppm_basic" {
-    var img = try JpImg.new(3, 3);
+    var img = try JpImg.new(8, 3);
     img.r[0][0] = 1;
     try img.image_write_to_ppm("image_write_to_ppm_basic.ppm");
     img.delete();

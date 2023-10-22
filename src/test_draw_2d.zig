@@ -1,8 +1,8 @@
 const std = @import("std");
-const draw_2d = @import("draw_2d.zig");
-const jp_img = @import("jp_img.zig");
-const jp_color = @import("jp_color.zig");
 const types = @import("types.zig");
+const jp_img = @import("jp_img.zig");
+const draw_2d = @import("draw_2d.zig");
+const jp_color = @import("jp_color.zig");
 
 const JpImg = jp_img.JpImg;
 

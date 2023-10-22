@@ -82,17 +82,17 @@ pub const JpImg = struct {
         const header = try std.fmt.allocPrint(
             allocator,
             "P3\n{d} {d}\n255\n",
-            .{ self.height, self.width },
+            .{ self.width, self.height },
         );
         try file.writeAll(header);
         defer allocator.free(header);
 
-        var _x: u16 = 0;
-        var _y: u16 = undefined;
+        var _x: u16 = undefined;
+        var _y: u16 = self.height;
 
-        while (_x < self.width) : (_x += 1) {
-            _y = self.height;
-            while (_y > 0) : (_y -= 1) {
+        while (_y > 0) : (_y -= 1) {
+            _x = 0;
+            while (_x < self.width) : (_x += 1) {
                 const line = try std.fmt.allocPrint(
                     allocator,
                     "\n{} {} {}",
