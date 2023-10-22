@@ -1,0 +1,9 @@
+### Some info to be skipped.
+### Some more.
+
+scene
+{
+render_camera "camera/name"
+resolution ! V 2
+1920 1080
+}

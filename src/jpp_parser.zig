@@ -6,10 +6,21 @@ const io = std.io;
 const allocator = std.heap.page_allocator;
 const jpp_format = @import("jpp_format.zig");
 const zig_utils = @import("zig_utils.zig");
+const jp_scene = @import("jp_scene.zig");
+const jp_object = @import("jp_object.zig");
+const jp_material = @import("jp_material.zig");
 
-pub const ErrorParsingJPP = error{ ParsingError, ExpetedNumber };
+const ShapeTypeId = jp_object.ShapeTypeId;
+const MaterialTypeId = jp_material.MaterialTypeId;
 
-// ==== PARSING OBJECT =======================================================
+pub const ErrorParsingJPP = error{
+    ParsingError,
+    ExpetedNumber,
+    WrongType,
+    MissingMandatoryValue,
+};
+
+// ==== PARSER ===============================================================
 
 const ParsingState = enum {
     ParsingEntityType,
@@ -29,15 +40,17 @@ pub const JppParser = struct {
     i_current_matrix_y_idx: u16,
     file_path: []const u8,
     parsing_section_list: std.ArrayList(*ParsingSection) = undefined,
+    render_camera_name: []const u8,
+    scene: *jp_scene.JpScene,
 
     const Self = @This();
 
-    pub fn parse(file_path: []const u8) !void {
+    pub fn parse(file_path: []const u8) !*jp_scene.JpScene {
 
         // instiating self.
         var parsing_section_list = try std.ArrayList(
             *ParsingSection,
-        ).initCapacity(allocator, 5);
+        ).initCapacity(allocator, 15);
         defer parsing_section_list.deinit();
 
         var self = try allocator.create(Self);
@@ -53,6 +66,8 @@ pub const JppParser = struct {
             .i_current_matrix_y_idx = undefined,
             .file_path = file_path,
             .parsing_section_list = parsing_section_list,
+            .render_camera_name = undefined,
+            .scene = undefined,
         };
 
         // reading file.
@@ -77,9 +92,26 @@ pub const JppParser = struct {
                 .ParsingSectionProperty => try self.state_ParsingSectionProperty(),
                 .ParsingVector => try self.state_ParsingVector(),
                 .ParsingMatrix => try self.state_ParsingMatrix(),
+                // else => {},
             }
         }
         try self.parsing_section_list.append(self.i_current_section);
+        // FIXME: DESTROY PARSING SECTION LIST!!
+
+        // first iteration on parsing section -> looking for scene definition.
+        var scene_found = false;
+        for (self.parsing_section_list.items) |section| {
+            // section.print_debug();
+            if (std.mem.eql(u8, section.section_type_name, "scene")) {
+                scene_found = true;
+                self.scene = try self.build_scene(section);
+            }
+        }
+        if (!scene_found) {
+            JppParser.log_build_error_missing_section("scene");
+            return ErrorParsingJPP.MissingMandatoryValue;
+        }
+        return self.scene;
     }
 
     // ---- STATES -----------------------------------------------------------
@@ -93,6 +125,7 @@ pub const JppParser = struct {
             self.exit_state_in_err(err_str);
             return;
         };
+
         if (words.next() != null) {
             var err_str = "expecting section name definition (one word)";
             self.exit_state_in_err(err_str);
@@ -103,7 +136,10 @@ pub const JppParser = struct {
         if (is_name_correct == false) {
             return;
         }
-        self.i_current_section = try ParsingSection.new(current_section_name);
+        self.i_current_section = try ParsingSection.new(
+            current_section_name,
+            self.i_line_number,
+        );
         self.i_state = ParsingState.ParsingSectionStart;
     }
 
@@ -117,13 +153,13 @@ pub const JppParser = struct {
             );
             defer allocator.free(err_str);
             self.exit_state_in_err(err_str);
+            return; //FIXME: not sure...
         }
         self.i_state = ParsingState.ParsingSectionProperty;
     }
 
     // ==> ParsingSectionProperty --------------------------------------------
     fn state_ParsingSectionProperty(self: *Self) !void {
-
         // 1 => if section definition finished
         if (std.mem.eql(u8, self.i_line, jpp_format.SYMBOL_SECTION_END)) {
             try self.parsing_section_list.append(self.i_current_section);
@@ -189,7 +225,9 @@ pub const JppParser = struct {
             self.i_current_property = try ParsingProperty.new_string(
                 property_name,
                 property_value,
+                self.i_line_number,
             );
+            try self.i_current_section.property_list.append(self.i_current_property);
             return;
         }
         // 4.2 => second word is a string.
@@ -197,6 +235,7 @@ pub const JppParser = struct {
         self.i_current_property = try ParsingProperty.new_number(
             property_name,
             property_value,
+            self.i_line_number,
         );
         try self.i_current_section.property_list.append(self.i_current_property);
     }
@@ -260,6 +299,7 @@ pub const JppParser = struct {
         self.i_current_property = ParsingProperty.new_vector(
             property_name,
             size orelse 0,
+            self.i_line_number,
         ) catch return null;
     }
 
@@ -277,6 +317,7 @@ pub const JppParser = struct {
             property_name,
             x_size orelse 0,
             y_size orelse 0,
+            self.i_line_number,
         ) catch return null;
         return;
     }
@@ -298,7 +339,6 @@ pub const JppParser = struct {
             return false;
         }
         const ret = std.ascii.isAlphabetic(name[0]);
-        // TODO: other check?
         if (ret == false) {
             var err_str = try std.fmt.allocPrint(
                 allocator,
@@ -355,6 +395,189 @@ pub const JppParser = struct {
         };
         return ret;
     }
+
+    // ---- BUILDING SCENE ---------------------------------------------------
+
+    pub fn build_scene(
+        self: *Self,
+        parsed_section: *ParsingSection,
+    ) !*jp_scene.JpScene {
+        var render_camera_defined = false;
+        var resolution_found = false;
+
+        var scene = try jp_scene.JpScene.new();
+        // errdefer scene.delete(); FIXME:
+
+        for (parsed_section.property_list.items) |property| {
+            if (std.mem.eql(u8, property.name, "render_camera")) {
+                render_camera_defined = true;
+                switch (property.value.*) {
+                    .String => self.render_camera_name = property.value.String,
+                    else => {
+                        try JppParser.log_build_error_wrong_type(
+                            property.name,
+                            "str",
+                            property.line,
+                        );
+                        return ErrorParsingJPP.WrongType;
+                    },
+                }
+            }
+            if (std.mem.eql(u8, property.name, "resolution")) {
+                resolution_found = true;
+                var valid_type = true;
+                switch (property.value.*) {
+                    .Vector => {},
+                    else => {
+                        valid_type = false;
+                    },
+                }
+                if (valid_type and property.value.Vector.size != 2) {
+                    valid_type = false;
+                }
+                if (!valid_type) {
+                    try JppParser.log_build_error_wrong_type(
+                        property.name,
+                        "vector size 2",
+                        property.line,
+                    );
+                    return ErrorParsingJPP.WrongType;
+                }
+                scene.resolution = types.Vec2u16{
+                    .x = @intFromFloat(property.value.Vector.vector[0]),
+                    .y = @intFromFloat(property.value.Vector.vector[1]),
+                };
+            }
+        }
+        if (!render_camera_defined) {
+            try JppParser.log_build_error_missing("render_camera", parsed_section.line);
+            return ErrorParsingJPP.MissingMandatoryValue;
+        }
+        if (!resolution_found) {
+            try JppParser.log_build_error_missing("resolution", parsed_section.line);
+            return ErrorParsingJPP.MissingMandatoryValue;
+        }
+        parsed_section.processed = true;
+        return scene;
+    }
+
+    pub fn build_material(
+        parsed_section: *ParsingSection,
+        material_type: MaterialTypeId,
+    ) ErrorParsingJPP!*jp_material.JpMaterial {
+        var name_found = false;
+        var material = jp_material.JpMaterial.new(material_type);
+        errdefer material.delete();
+        for (parsed_section.property_list.items()) |property| {
+            if (std.mem.eql(u8, property.name, "name")) {
+                name_found = true;
+                switch (property.value) {
+                    .String => material.name = property.value,
+                    else => {
+                        JppParser.log_build_error(
+                            property.line,
+                            "'name' is expected to be a string",
+                        );
+                        return ErrorParsingJPP.WrongType;
+                    },
+                }
+            }
+        }
+        if (!name_found) {
+            JppParser.log_build_error(
+                parsed_section.line,
+                "expected 'name' property, not found",
+            );
+            return ErrorParsingJPP.MissingMandatoryValue;
+        }
+    }
+
+    // fn build_lambert(parsed_section: *ParsingSection, material:
+
+    pub fn build_object(
+        parsed_section: *ParsingSection,
+        shape_type: ShapeTypeId,
+    ) ErrorParsingJPP!*jp_scene.JpScene {
+        var name_found = false;
+        var object = jp_object.JpObject.new(shape_type);
+        errdefer object.delete();
+        for (parsed_section.property_list.items()) |property| {
+            if (std.mem.eql(u8, property.name, "name")) {
+                name_found = true;
+                switch (property.value) {
+                    .String => object.name = property.value,
+                    else => {
+                        //TODO : log
+                        return ErrorParsingJPP.MissingMandatoryValue;
+                    },
+                }
+            } else if (std.mem.eql(u8, property.name, "tmatrix")) {
+                switch (property.value) {
+                    .Matrix => {
+                        if (property.value.Matrix.x_size != 4 or
+                            property.value.Matrix.y_size != 4)
+                        {
+                            //TODO: log.
+                            return ErrorParsingJPP.ErrorParsingJPP;
+                        }
+                    },
+                    else => {
+                        // TODO log
+                        return ErrorParsingJPP.WrongType;
+                    },
+                }
+                var i: usize = 0;
+                var j: usize = 0;
+                while (i < 4) : (i += 1) {
+                    while (j < 4) : (j += 1) {
+                        object.tmatrix.m[i][j] = property.value.Matrix.matrix[i][j];
+                    }
+                }
+            }
+        }
+        if (!name_found) {
+            //TODO: log.
+            return ErrorParsingJPP.MissingMandatoryValue;
+        }
+        // TODO: SHAPE BUILDER...
+        switch (shape_type) {
+            .ImplicitSphere => {},
+            .CameraPersp => {},
+            .LightOmni => {},
+        }
+    }
+
+    fn log_build_error_missing_section(section_name: []const u8) void {
+        std.log.err("missing mandatory section: {s}", .{section_name});
+    }
+
+    fn log_build_error_missing(section_name: []const u8, line: u16) !void {
+        const err_str = try std.fmt.allocPrint(
+            allocator,
+            "missing mandatory property: {s}",
+            .{section_name},
+        );
+        defer allocator.free(err_str);
+        JppParser.log_build_error(err_str, line);
+    }
+
+    fn log_build_error_wrong_type(
+        property_name: []const u8,
+        expected_type_as_str: []const u8,
+        line: u16,
+    ) !void {
+        const err_str = try std.fmt.allocPrint(
+            allocator,
+            "wong type for property '{s}', expected type is: {s}",
+            .{ property_name, expected_type_as_str },
+        );
+        defer allocator.free(err_str);
+        JppParser.log_build_error(err_str, line);
+    }
+
+    fn log_build_error(mess: []const u8, line: u16) void {
+        std.log.err("line {d} : {s}.", .{ line, mess });
+    }
 };
 
 // ==== PARSING SECTION DTO ==================================================
@@ -362,64 +585,97 @@ pub const JppParser = struct {
 const ParsingSection = struct {
     section_type_name: []const u8 = undefined,
     property_list: std.ArrayList(*ParsingProperty) = undefined,
+    line: u16 = undefined,
+    processed: bool = false,
 
     const Self = @This();
 
-    pub fn new(section_type_name: []const u8) !*Self {
+    pub fn new(section_type_name: []const u8, line: u16) !*Self {
         var instance = try allocator.create(Self);
+        const copied = try allocator.alloc(u8, section_type_name.len); // ?? why is this needed?
+        std.mem.copy(u8, copied, section_type_name);
         instance.* = Self{
-            .section_type_name = section_type_name,
+            .section_type_name = copied,
             .property_list = try std.ArrayList(
                 *ParsingProperty,
             ).initCapacity(allocator, 5),
+            .line = line,
         };
         return instance;
     }
 
     pub fn delete(self: *Self) void {
         // FIXME: delete properties !!!!
+        allocator.free(self.section_type_name);
         self.property_list.deinit();
         allocator.destroy(self);
+    }
+
+    pub fn print_debug(self: *Self) void {
+        std.debug.print("\n{s}\n", .{self.section_type_name});
+        for (self.property_list.items) |property| {
+            switch (property.value.*) {
+                .String => {
+                    std.debug.print("    - {s} (string): {s}\n", .{ property.name, property.value.String });
+                },
+                .Number => {
+                    std.debug.print("    - {s} (number): {d}\n", .{ property.name, property.value.Number });
+                },
+                .Vector => {
+                    std.debug.print("    - {s} (vector).\n", .{property.name});
+                },
+                .Matrix => {
+                    std.debug.print("    - {s} (matrix).\n", .{property.name});
+                },
+            }
+        }
+        std.debug.print("\n", .{});
     }
 };
 
 const ParsingProperty = struct {
     name: []const u8,
     value: *ParsingPropertyValue,
+    line: u16 = undefined,
 
     const Self = @This();
 
-    pub fn new_number(name: []const u8, number: f32) !*Self {
-        var instance = try Self._new(name);
+    pub fn new_number(name: []const u8, number: f32, line: u16) !*Self {
+        var instance = try Self._new(name, line);
         instance.value.* = ParsingPropertyValue{ .Number = number };
         return instance;
     }
 
-    pub fn new_string(name: []const u8, string: []const u8) !*Self {
-        var instance = try Self._new(name);
-        instance.value.* = ParsingPropertyValue{ .String = string };
+    pub fn new_string(name: []const u8, string: []const u8, line: u16) !*Self {
+        const copied = try allocator.alloc(u8, string.len); // ?? why is this needed?
+        std.mem.copy(u8, copied, string);
+        var instance = try Self._new(name, line);
+        instance.value.* = ParsingPropertyValue{ .String = copied };
         return instance;
     }
 
-    pub fn new_matrix(name: []const u8, x_size: u16, y_size: u16) !*Self {
-        var instance = try Self._new(name);
+    pub fn new_matrix(name: []const u8, x_size: u16, y_size: u16, line: u16) !*Self {
+        var instance = try Self._new(name, line);
         instance.value.* = ParsingPropertyValue{
             .Matrix = try ParsingPropertyMatrix.new(x_size, y_size),
         };
         return instance;
     }
 
-    pub fn new_vector(name: []const u8, size: u16) !*Self {
-        var instance = try Self._new(name);
+    pub fn new_vector(name: []const u8, size: u16, line: u16) !*Self {
+        var instance = try Self._new(name, line);
         var vec: *ParsingPropertyVector = try ParsingPropertyVector.new(size);
         instance.value.* = ParsingPropertyValue{ .Vector = vec };
         return instance;
     }
 
-    fn _new(name: []const u8) !*Self {
+    fn _new(name: []const u8, line: u16) !*Self {
+        const copied = try allocator.alloc(u8, name.len); // ?? why is this needed?
+        std.mem.copy(u8, copied, name);
+
         var instance = try allocator.create(Self);
         var value = try allocator.create(ParsingPropertyValue);
-        instance.* = Self{ .name = name, .value = value };
+        instance.* = Self{ .name = copied, .value = value, .line = line };
         return instance;
     }
 
@@ -427,8 +683,10 @@ const ParsingProperty = struct {
         switch (self.value) {
             .Matrix => self.value.Matrix.delete(),
             .Vector => self.value.Vector.delete(),
+            .String => allocator.free(self.value.String),
             else => {},
         }
+        allocator.free(self.name);
         allocator.destroy(self.value);
         allocator.destroy(self);
     }

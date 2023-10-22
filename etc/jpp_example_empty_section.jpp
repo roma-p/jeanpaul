@@ -3,6 +3,9 @@
 
 scene
 {
+resolution ! V 2
+1920 1080
+render_camera "camera/name"
 }
 
 camera.persp
