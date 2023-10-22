@@ -23,4 +23,5 @@ light.omni
 # com to skip...
 material.Lambert
 {
+name "Lambert1"
 }

@@ -52,3 +52,11 @@ Kd 0.45
 Kd_color ! V 3
 1 0 0
 }
+
+material.Lambert
+{
+name "lambert2"
+Kd 0.45
+Kd_color ! V 3
+1 0 0
+}
