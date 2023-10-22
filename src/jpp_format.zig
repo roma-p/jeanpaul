@@ -23,14 +23,16 @@ pub const STR_ID_OBJECT = "object";
 pub const STR_ID_MATERIAL = "material";
 pub const STR_ID_SCENE = "scene";
 
-const TypeNotFound = error{
+pub const TypeNotFound = error{
     ShapeTypeNotFound,
+    NotShapeType,
+    NotMaterialType,
     MaterialTypeNotFound,
 };
 
 // OBJECT HELPERS ------------------------------------------------------------
 
-pub fn get_shape_id_from_str(str: []u8) TypeNotFound!ShapeTypeId {
+pub fn get_shape_id_from_str(str: []const u8) TypeNotFound!ShapeTypeId {
     switch (str) {
         @tagName(ShapeTypeId.ImplicitSphere) => return ShapeTypeId.ImplicitSphere,
         @tagName(ShapeTypeId.CameraPersp) => return ShapeTypeId.CameraPersp,
@@ -45,42 +47,23 @@ pub fn get_str_from_shape_id(shape_type: ShapeTypeId) []u8 {
 
 // MATERIAL HELPERS ----------------------------------------------------------
 
-pub fn get_material_id_from_str(str: []u8) TypeNotFound!MaterialTypeId {
-    switch (str) {
-        @tagName(MaterialTypeId.Lambert) => return MaterialTypeId.Lambert,
-        else => return TypeNotFound.MaterialTypeNotFound,
+pub fn get_material_id_from_str(str: []const u8) TypeNotFound!MaterialTypeId {
+    if (str.len + 1 < STR_ID_MATERIAL.len) {
+        return TypeNotFound.NotMaterialType;
+    }
+    std.debug.print("\n{s}", .{str[0 .. STR_ID_MATERIAL.len + 1]});
+    std.debug.print("\n{s}", .{STR_ID_MATERIAL ++ "."});
+    if (!std.mem.eql(u8, str[0 .. STR_ID_MATERIAL.len + 1], STR_ID_MATERIAL ++ ".")) {
+        return TypeNotFound.NotMaterialType;
+    }
+    const mat_type = str[STR_ID_MATERIAL.len + 1 .. str.len];
+    if (std.mem.eql(u8, mat_type, @tagName(MaterialTypeId.Lambert))) {
+        return MaterialTypeId.Lambert;
+    } else {
+        return TypeNotFound.MaterialTypeNotFound;
     }
 }
 
 pub fn get_str_from_material_id(material_type: MaterialTypeId) []u8 {
-    return @tagName(material_type);
-}
-
-// pub fn is_type_id_supported(str: []u8) bool {
-// }
-
-// pub fn type_id_to_shape_id(str: []u8) TypeNotFound!jp_object.ShapeTypeId {
-//     if (compare_str(str, STR_CAMERA_PERSP)) {
-//         return jp_object.ShapeTypeId.CameraPersp;
-//     } else if (compare_str(str, STR_IMPLICIT_SPHERE)) {
-//         return jp_object.ShapeTypeId.ImplicitSphere;
-//     } else if (compare_str(str, STR_LIGHT_OMNI)) {
-//         return jp_object.ShapeTypeId.LightOmni;
-//     } else {
-//         return TypeNotFound.ShapeTypeNotFound;
-//     }
-// }
-//
-// pub fn shape_id_to_type_id(shape_type_id: jp_object.ShapeTypeId) []u8 {
-//     switch (shape_type_id) {
-//         .CameraPersp => return STR_CAMERA_PERSP,
-//         .ImplicitSphere => return STR_IMPLICIT_SPHERE,
-//         .LightOmni => return STR_LIGHT_OMNI,
-//     }
-// }
-//
-// TODO: put this func (and cast to u8 in a new zig_utils module...)
-
-fn compare_str(str1: []u8, str2: []u8) !bool {
-    return std.mem.eql(u8, str1, str2);
+    return STR_ID_MATERIAL ++ "." ++ @tagName(material_type);
 }

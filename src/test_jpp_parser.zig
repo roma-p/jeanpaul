@@ -1,5 +1,6 @@
 const std = @import("std");
 const jpp_parser = @import("jpp_parser.zig");
+const jp_scene = @import("jp_scene.zig");
 
 const JppParser = jpp_parser.JppParser;
 const ErrorParsingJPP = jpp_parser.ErrorParsingJPP;
@@ -37,5 +38,12 @@ test "missing_delimiter" {
     _ = try std.testing.expectError(
         ErrorParsingJPP.ParsingError,
         JppParser.parse("etc/jpp_missing_delimiter.jpp"),
+    );
+}
+
+test "clone_mat" {
+    _ = try std.testing.expectError(
+        jp_scene.JpSceneError.NameNotAvailable,
+        JppParser.parse("etc/jpp_clone_map.jpp"),
     );
 }

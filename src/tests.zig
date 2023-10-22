@@ -7,6 +7,7 @@ comptime {
     _ = @import("test_jp_scene.zig");
     _ = @import("test_render.zig");
     _ = @import("test_jp_ray.zig");
+    _ = @import("test_jpp_format.zig");
     _ = @import("test_jpp_parser.zig");
 }
 

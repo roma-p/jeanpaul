@@ -1,9 +1,5 @@
 const std = @import("std");
 const types = @import("types.zig");
-const log = std.log;
-const fs = std.fs;
-const io = std.io;
-const allocator = std.heap.page_allocator;
 const jpp_format = @import("jpp_format.zig");
 const zig_utils = @import("zig_utils.zig");
 const jp_scene = @import("jp_scene.zig");
@@ -13,11 +9,18 @@ const jp_material = @import("jp_material.zig");
 const ShapeTypeId = jp_object.ShapeTypeId;
 const MaterialTypeId = jp_material.MaterialTypeId;
 
+const log = std.log;
+const fs = std.fs;
+const io = std.io;
+const allocator = std.heap.page_allocator;
+
 pub const ErrorParsingJPP = error{
+    AllocationError,
     ParsingError,
     ExpetedNumber,
     WrongType,
     MissingMandatoryValue,
+    PropertyNotFound,
 };
 
 // ==== PARSER ===============================================================
@@ -92,7 +95,6 @@ pub const JppParser = struct {
                 .ParsingSectionProperty => try self.state_ParsingSectionProperty(),
                 .ParsingVector => try self.state_ParsingVector(),
                 .ParsingMatrix => try self.state_ParsingMatrix(),
-                // else => {},
             }
         }
         try self.parsing_section_list.append(self.i_current_section);
@@ -105,12 +107,32 @@ pub const JppParser = struct {
             if (std.mem.eql(u8, section.section_type_name, "scene")) {
                 scene_found = true;
                 self.scene = try self.build_scene(section);
+                break;
             }
         }
         if (!scene_found) {
             JppParser.log_build_error_missing_section("scene");
             return ErrorParsingJPP.MissingMandatoryValue;
         }
+        for (self.parsing_section_list.items) |section| {
+            std.debug.print("\n--> {s}", .{section.section_type_name});
+            if (section.processed) continue;
+            const mat_type = jpp_format.get_material_id_from_str(
+                section.section_type_name,
+            ) catch |err| {
+                switch (err) {
+                    jpp_format.TypeNotFound.NotMaterialType => continue,
+                    jpp_format.TypeNotFound.MaterialTypeNotFound => {
+                        // log material not found.
+                        return ErrorParsingJPP.ParsingError;
+                    },
+                    else => unreachable,
+                }
+            };
+            std.debug.print("\n--> ouiii", .{});
+            try self.build_material(section, mat_type);
+        }
+
         return self.scene;
     }
 
@@ -462,21 +484,43 @@ pub const JppParser = struct {
     }
 
     pub fn build_material(
+        self: *Self,
         parsed_section: *ParsingSection,
         material_type: MaterialTypeId,
-    ) ErrorParsingJPP!*jp_material.JpMaterial {
-        var name_found = false;
-        var material = jp_material.JpMaterial.new(material_type);
+    ) !void {
+        parsed_section.processed = true;
+        const name = try JppParser.find_parsing_section_name(parsed_section);
+        std.debug.print("\n----> {s}", .{name});
+        var material = jp_material.JpMaterial.new(
+            name,
+            material_type,
+        ) catch return ErrorParsingJPP.AllocationError;
         errdefer material.delete();
-        for (parsed_section.property_list.items()) |property| {
+        self.scene.add_material(material) catch |err| {
+            if (err == jp_scene.JpSceneError.NameNotAvailable) {
+                std.log.err(
+                    "line {d} -> already a material named {s}",
+                    .{ self.i_line_number, name },
+                );
+            }
+            return err;
+        };
+    }
+
+    fn find_parsing_section_name(
+        parsed_section: *ParsingSection,
+    ) ErrorParsingJPP![]const u8 {
+        var name_found = false;
+        var name: []const u8 = undefined;
+        for (parsed_section.property_list.items) |property| {
             if (std.mem.eql(u8, property.name, "name")) {
                 name_found = true;
-                switch (property.value) {
-                    .String => material.name = property.value,
+                switch (property.value.*) {
+                    .String => name = property.value.String,
                     else => {
                         JppParser.log_build_error(
-                            property.line,
                             "'name' is expected to be a string",
+                            property.line,
                         );
                         return ErrorParsingJPP.WrongType;
                     },
@@ -485,11 +529,12 @@ pub const JppParser = struct {
         }
         if (!name_found) {
             JppParser.log_build_error(
-                parsed_section.line,
                 "expected 'name' property, not found",
+                parsed_section.line,
             );
             return ErrorParsingJPP.MissingMandatoryValue;
         }
+        return name;
     }
 
     // fn build_lambert(parsed_section: *ParsingSection, material:
@@ -630,6 +675,15 @@ const ParsingSection = struct {
             }
         }
         std.debug.print("\n", .{});
+    }
+
+    pub fn get_property(self: *Self, name: []const u8) !void {
+        for (self.property_list.items) |property| {
+            if (std.mem.eql(u8, property.name, name)) {
+                return property;
+            }
+        }
+        return ErrorParsingJPP.PropertyNotFound;
     }
 };
 
