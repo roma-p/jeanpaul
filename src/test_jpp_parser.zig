@@ -47,3 +47,10 @@ test "clone_mat" {
         JppParser.parse("etc/jpp_clone_map.jpp"),
     );
 }
+
+test "wrong_type" {
+    _ = try std.testing.expectError(
+        ErrorParsingJPP.WrongType,
+        JppParser.parse("etc/jpp_wrong_type.jpp"),
+    );
+}

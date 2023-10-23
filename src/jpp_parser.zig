@@ -253,6 +253,7 @@ pub const JppParser = struct {
             return;
         }
         // 4.2 => second word is a string.
+        // FIXME: string with space doest not work! fix it!!
         const property_value = try self.conv_word_to_f32(second_word) orelse return;
         self.i_current_property = try ParsingProperty.new_number(
             property_name,
@@ -433,38 +434,12 @@ pub const JppParser = struct {
         for (parsed_section.property_list.items) |property| {
             if (std.mem.eql(u8, property.name, "render_camera")) {
                 render_camera_defined = true;
-                switch (property.value.*) {
-                    .String => self.render_camera_name = property.value.String,
-                    else => {
-                        try JppParser.log_build_error_wrong_type(
-                            property.name,
-                            "str",
-                            property.line,
-                        );
-                        return ErrorParsingJPP.WrongType;
-                    },
-                }
+                try property.check_is_string();
+                self.render_camera_name = property.value.String;
             }
             if (std.mem.eql(u8, property.name, "resolution")) {
                 resolution_found = true;
-                var valid_type = true;
-                switch (property.value.*) {
-                    .Vector => {},
-                    else => {
-                        valid_type = false;
-                    },
-                }
-                if (valid_type and property.value.Vector.size != 2) {
-                    valid_type = false;
-                }
-                if (!valid_type) {
-                    try JppParser.log_build_error_wrong_type(
-                        property.name,
-                        "vector size 2",
-                        property.line,
-                    );
-                    return ErrorParsingJPP.WrongType;
-                }
+                try property.check_is_vector(2);
                 scene.resolution = types.Vec2u16{
                     .x = @intFromFloat(property.value.Vector.vector[0]),
                     .y = @intFromFloat(property.value.Vector.vector[1]),
@@ -498,6 +473,7 @@ pub const JppParser = struct {
         errdefer material.delete();
         self.scene.add_material(material) catch |err| {
             if (err == jp_scene.JpSceneError.NameNotAvailable) {
+                //TODO: use "logline"
                 std.log.err(
                     "line {d} -> already a material named {s}",
                     .{ self.i_line_number, name },
@@ -744,9 +720,126 @@ const ParsingProperty = struct {
         allocator.destroy(self.value);
         allocator.destroy(self);
     }
+
+    pub fn check_is_string(self: *Self) !void {
+        switch (self.value.*) {
+            .String => return,
+            else => {
+                var err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "{s} expected to be a {s}, find: {s}",
+                    .{
+                        self.name,
+                        @tagName(ParsingPropertyValueType.String),
+                        @tagName(self.value.*),
+                    },
+                );
+                defer allocator.free(err_str);
+                JppParser.log_build_error(err_str, self.line);
+                return ErrorParsingJPP.WrongType;
+            },
+        }
+    }
+
+    pub fn check_is_number(self: *Self) !void {
+        switch (self.value.*) {
+            .Number => return,
+            else => {
+                var err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "{s} expected to be a {s}, find: {s}",
+                    .{
+                        self.name,
+                        @tagName(ParsingPropertyValueType.Number),
+                        @tagName(self.value.*),
+                    },
+                );
+                defer allocator.free(err_str);
+                JppParser.log_build_error(err_str, self.line);
+                return ErrorParsingJPP.WrongType;
+            },
+        }
+    }
+
+    pub fn check_is_vector(self: *Self, size: u16) !void {
+        switch (self.value.*) {
+            .Vector => {
+                if (self.value.Vector.size != size) {
+                    var err_str = try std.fmt.allocPrint(
+                        allocator,
+                        "{s} vector expected size is: {d}, found: {d}",
+                        .{ self.name, size, self.value.Vector.size },
+                    );
+                    defer allocator.free(err_str);
+                    JppParser.log_build_error(err_str, self.line);
+                    return ErrorParsingJPP.WrongType;
+                }
+            },
+            else => {
+                var err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "{s} expected to be a {s}, find: {s}",
+                    .{
+                        self.name,
+                        @tagName(ParsingPropertyValueType.Vector),
+                        @tagName(self.value.*),
+                    },
+                );
+                defer allocator.free(err_str);
+                JppParser.log_build_error(err_str, self.line);
+                return ErrorParsingJPP.WrongType;
+            },
+        }
+    }
+
+    pub fn check_is_matrix(self: *Self, x_size: u16, y_size: u16) !void {
+        switch (self.value.*) {
+            .Matrix => {
+                if (self.value.Matrix.x_size != x_size or
+                    self.value.Matrix.y_size != y_size)
+                {
+                    var err_str = try std.fmt.allocPrint(
+                        allocator,
+                        "{s} vector expected size is: {d}x{d}, found: {d}x{d}",
+                        .{
+                            self.name,
+                            x_size,
+                            y_size,
+                            self.value.Matrix.x_size,
+                            self.value.Matrix.y_size,
+                        },
+                    );
+                    defer allocator.free(err_str);
+                    JppParser.log_build_error(err_str, self.line);
+                    return ErrorParsingJPP.WrongType;
+                }
+            },
+            else => {
+                var err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "{s} expected to be {s}, find: {s}",
+                    .{
+                        self.name,
+                        @tagName(ParsingPropertyValueType.Matrix),
+                        @tagName(self.value.*),
+                    },
+                );
+                defer allocator.free(err_str);
+                JppParser.log_build_error(err_str, self.line);
+                return ErrorParsingJPP.WrongType;
+            },
+        }
+    }
 };
 
-const ParsingPropertyValue = union(enum) {
+const ParsingPropertyValueType = enum {
+    Number,
+    String,
+    Matrix,
+    Vector,
+};
+
+const ParsingPropertyValue = union(ParsingPropertyValueType) {
     Number: f32,
     String: []const u8,
     Matrix: *ParsingPropertyMatrix,
