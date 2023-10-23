@@ -48,7 +48,7 @@ intensity 0.7
 material.Lambert
 {
 name "lambert1"
-Kd 0.45
-Kd_color ! V 3
+kd_intensity 0.45
+kd_color ! V 3
 1 0 0
 }

@@ -103,7 +103,6 @@ pub const JppParser = struct {
         // first iteration on parsing section -> looking for scene definition.
         var scene_found = false;
         for (self.parsing_section_list.items) |section| {
-            // section.print_debug();
             if (std.mem.eql(u8, section.section_type_name, "scene")) {
                 scene_found = true;
                 self.scene = try self.build_scene(section);
@@ -115,7 +114,6 @@ pub const JppParser = struct {
             return ErrorParsingJPP.MissingMandatoryValue;
         }
         for (self.parsing_section_list.items) |section| {
-            std.debug.print("\n--> {s}", .{section.section_type_name});
             if (section.processed) continue;
             const mat_type = jpp_format.get_material_id_from_str(
                 section.section_type_name,
@@ -129,7 +127,6 @@ pub const JppParser = struct {
                     else => unreachable,
                 }
             };
-            std.debug.print("\n--> ouiii", .{});
             try self.build_material(section, mat_type);
         }
 
@@ -465,7 +462,6 @@ pub const JppParser = struct {
     ) !void {
         parsed_section.processed = true;
         const name = try JppParser.find_parsing_section_name(parsed_section);
-        std.debug.print("\n----> {s}", .{name});
         var material = jp_material.JpMaterial.new(
             name,
             material_type,
@@ -476,31 +472,47 @@ pub const JppParser = struct {
                 //TODO: use "logline"
                 std.log.err(
                     "line {d} -> already a material named {s}",
-                    .{ self.i_line_number, name },
+                    .{ parsed_section.line, name },
                 );
             }
             return err;
         };
+        try JppParser.build_material_lambert(parsed_section, material);
+        JppParser.log_all_unprocessed_properties(parsed_section);
+    }
+
+    fn build_material_lambert(
+        parsed_section: *ParsingSection,
+        material: *jp_material.JpMaterial,
+    ) !void {
+        for (parsed_section.property_list.items) |property| {
+            if (property.processed) continue;
+            if (std.mem.eql(u8, property.name, "kd_color")) {
+                property.processed = true;
+                try property.check_is_color();
+                material.mat.Lambert.kd_color.r = property.value.Vector.vector[0];
+                material.mat.Lambert.kd_color.g = property.value.Vector.vector[1];
+                material.mat.Lambert.kd_color.b = property.value.Vector.vector[2];
+            }
+            if (std.mem.eql(u8, property.name, "kd_intensity")) {
+                property.processed = true;
+                try property.check_is_number();
+                material.mat.Lambert.kd_intensity = property.value.Number;
+            }
+        }
     }
 
     fn find_parsing_section_name(
         parsed_section: *ParsingSection,
-    ) ErrorParsingJPP![]const u8 {
+    ) ![]const u8 {
         var name_found = false;
         var name: []const u8 = undefined;
         for (parsed_section.property_list.items) |property| {
             if (std.mem.eql(u8, property.name, "name")) {
                 name_found = true;
-                switch (property.value.*) {
-                    .String => name = property.value.String,
-                    else => {
-                        JppParser.log_build_error(
-                            "'name' is expected to be a string",
-                            property.line,
-                        );
-                        return ErrorParsingJPP.WrongType;
-                    },
-                }
+                property.processed = true;
+                try property.check_is_string();
+                name = property.value.String;
             }
         }
         if (!name_found) {
@@ -511,6 +523,16 @@ pub const JppParser = struct {
             return ErrorParsingJPP.MissingMandatoryValue;
         }
         return name;
+    }
+
+    fn log_all_unprocessed_properties(parsed_section: *ParsingSection) void {
+        for (parsed_section.property_list.items) |property| {
+            if (property.processed) continue;
+            std.log.warn(
+                "line {d} : {s} -> {s} : unknown property, skipped",
+                .{ property.line, parsed_section.section_type_name, property.name },
+            );
+        }
     }
 
     // fn build_lambert(parsed_section: *ParsingSection, material:
@@ -667,6 +689,7 @@ const ParsingProperty = struct {
     name: []const u8,
     value: *ParsingPropertyValue,
     line: u16 = undefined,
+    processed: bool = false,
 
     const Self = @This();
 
@@ -758,6 +781,25 @@ const ParsingProperty = struct {
                 JppParser.log_build_error(err_str, self.line);
                 return ErrorParsingJPP.WrongType;
             },
+        }
+    }
+
+    pub fn check_is_color(self: *Self) !void {
+        try self.check_is_vector(3);
+        var status = true;
+        var i: usize = 0;
+        while (i < 3) : (i += 1) {
+            const value = self.value.Vector.vector[i];
+            if (value < 0 or value > 1) {
+                status = false;
+            }
+        }
+        if (!status) {
+            JppParser.log_build_error(
+                "wrong color value: color values are exepcted to be between 0 and 1",
+                self.line,
+            );
+            return ErrorParsingJPP.WrongType;
         }
     }
 

@@ -51,8 +51,6 @@ pub fn get_material_id_from_str(str: []const u8) TypeNotFound!MaterialTypeId {
     if (str.len + 1 < STR_ID_MATERIAL.len) {
         return TypeNotFound.NotMaterialType;
     }
-    std.debug.print("\n{s}", .{str[0 .. STR_ID_MATERIAL.len + 1]});
-    std.debug.print("\n{s}", .{STR_ID_MATERIAL ++ "."});
     if (!std.mem.eql(u8, str[0 .. STR_ID_MATERIAL.len + 1], STR_ID_MATERIAL ++ ".")) {
         return TypeNotFound.NotMaterialType;
     }

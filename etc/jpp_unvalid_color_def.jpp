@@ -5,7 +5,7 @@ scene
 {
 resolution ! V 2
 1920 1080
-camera "camera/name"
+render_camera "camera/name"
 }
 
 camera.persp
@@ -17,6 +17,7 @@ tmatrix ! M 4 4
 1 0 0 0
 0 1 0 0
 0 0 1 0
+0 0 0 1
 }
 
 implicit.sphere
@@ -50,4 +51,14 @@ name "lambert1"
 kd_intensity 0.45
 kd_color ! V 3
 1 0 0
+unknow_properties ! V 2 # does not exist, shall be logged and skipped.
+0 1
+}
+
+material.Lambert
+{
+name "lambert2"
+kd_intensity 0.45
+kd_color ! V 3
+1 0 2
 }

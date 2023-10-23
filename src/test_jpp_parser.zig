@@ -54,3 +54,14 @@ test "wrong_type" {
         JppParser.parse("etc/jpp_wrong_type.jpp"),
     );
 }
+
+test "wrong_color" {
+    _ = try std.testing.expectError(
+        ErrorParsingJPP.WrongType,
+        JppParser.parse("etc/jpp_unvalid_color_def.jpp"),
+    );
+    _ = try std.testing.expectError(
+        ErrorParsingJPP.WrongType,
+        JppParser.parse("etc/jpp_unvalid_color_def_2.jpp"),
+    );
+}
