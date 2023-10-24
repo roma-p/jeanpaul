@@ -113,6 +113,7 @@ pub const JppParser = struct {
             JppParser.log_build_error_missing_section("scene");
             return ErrorParsingJPP.MissingMandatoryValue;
         }
+        // second iteration on parsing section -> build all materials.
         for (self.parsing_section_list.items) |section| {
             if (section.processed) continue;
             const mat_type = jpp_format.get_material_id_from_str(
@@ -121,14 +122,22 @@ pub const JppParser = struct {
                 switch (err) {
                     jpp_format.TypeNotFound.NotMaterialType => continue,
                     jpp_format.TypeNotFound.MaterialTypeNotFound => {
-                        // log material not found.
-                        return ErrorParsingJPP.ParsingError;
+                        const err_str = try std.fmt.allocPrint(
+                            allocator,
+                            "material type unknown: {s}",
+                            .{section.section_type_name},
+                        );
+                        defer allocator.free(err_str);
+                        JppParser.log_build_error(err_str, section.line);
+                        return err;
                     },
                     else => unreachable,
                 }
             };
             try self.build_material(section, mat_type);
         }
+        // third iteration on parsing section -> build all objects.
+        // reconnecting render camera.
 
         return self.scene;
     }
@@ -461,23 +470,78 @@ pub const JppParser = struct {
         material_type: MaterialTypeId,
     ) !void {
         parsed_section.processed = true;
+
+        // 1 - build JpMaterial object and add it to scene!
         const name = try JppParser.find_parsing_section_name(parsed_section);
         var material = jp_material.JpMaterial.new(
             name,
             material_type,
         ) catch return ErrorParsingJPP.AllocationError;
         errdefer material.delete();
+
         self.scene.add_material(material) catch |err| {
             if (err == jp_scene.JpSceneError.NameNotAvailable) {
-                //TODO: use "logline"
-                std.log.err(
-                    "line {d} -> already a material named {s}",
-                    .{ parsed_section.line, name },
+                const err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "already a material named: {s}",
+                    .{name},
                 );
+                defer allocator.free(err_str);
+                JppParser.log_build_error(err_str, parsed_section.line);
             }
             return err;
         };
-        try JppParser.build_material_lambert(parsed_section, material);
+
+        // 2 - call custom builder for each type.
+        if (material_type == MaterialTypeId.Lambert) {
+            try JppParser.build_material_lambert(parsed_section, material);
+        }
+        JppParser.log_all_unprocessed_properties(parsed_section);
+    }
+
+    pub fn build_object(
+        self: *Self,
+        parsed_section: *ParsingSection,
+        shape_type: ShapeTypeId,
+    ) !*jp_scene.JpScene {
+        parsed_section.processed = true;
+
+        // 1 - build JpObject object and add it to scene!
+        const name = try JppParser.find_parsing_section_name(parsed_section);
+        var object = jp_object.JpObject.new(
+            name,
+            shape_type,
+        ) catch return ErrorParsingJPP.AllocationError;
+        errdefer object.delete();
+
+        self.scene.add_object(object) catch |err| {
+            if (err == jp_scene.JpSceneError.NameNotAvailable) {
+                const err_str = try std.fmt.allocPrint(
+                    allocator,
+                    "already an object named: {s}",
+                    .{name},
+                );
+                defer allocator.free(err_str);
+                JppParser.log_build_error(err_str, parsed_section.line);
+            }
+            return err;
+        };
+
+        // 2 - if tmatrix defined: copy paste it.
+        for (parsed_section.property_list.items) |property| {
+            if (std.mem.eql(u8, property.name, "tmatrix")) {
+                try property.check_is_matrix(4, 4);
+                var i: usize = 0;
+                var j: usize = 0;
+                while (i < 4) : (i += 1) {
+                    while (j < 4) : (j += 1) {
+                        object.tmatrix.m[i][j] = property.value.Matrix.matrix[i][j];
+                    }
+                }
+            }
+        }
+
+        // 3 - call custom builder for each type.
         JppParser.log_all_unprocessed_properties(parsed_section);
     }
 
@@ -532,61 +596,6 @@ pub const JppParser = struct {
                 "line {d} : {s} -> {s} : unknown property, skipped",
                 .{ property.line, parsed_section.section_type_name, property.name },
             );
-        }
-    }
-
-    // fn build_lambert(parsed_section: *ParsingSection, material:
-
-    pub fn build_object(
-        parsed_section: *ParsingSection,
-        shape_type: ShapeTypeId,
-    ) ErrorParsingJPP!*jp_scene.JpScene {
-        var name_found = false;
-        var object = jp_object.JpObject.new(shape_type);
-        errdefer object.delete();
-        for (parsed_section.property_list.items()) |property| {
-            if (std.mem.eql(u8, property.name, "name")) {
-                name_found = true;
-                switch (property.value) {
-                    .String => object.name = property.value,
-                    else => {
-                        //TODO : log
-                        return ErrorParsingJPP.MissingMandatoryValue;
-                    },
-                }
-            } else if (std.mem.eql(u8, property.name, "tmatrix")) {
-                switch (property.value) {
-                    .Matrix => {
-                        if (property.value.Matrix.x_size != 4 or
-                            property.value.Matrix.y_size != 4)
-                        {
-                            //TODO: log.
-                            return ErrorParsingJPP.ErrorParsingJPP;
-                        }
-                    },
-                    else => {
-                        // TODO log
-                        return ErrorParsingJPP.WrongType;
-                    },
-                }
-                var i: usize = 0;
-                var j: usize = 0;
-                while (i < 4) : (i += 1) {
-                    while (j < 4) : (j += 1) {
-                        object.tmatrix.m[i][j] = property.value.Matrix.matrix[i][j];
-                    }
-                }
-            }
-        }
-        if (!name_found) {
-            //TODO: log.
-            return ErrorParsingJPP.MissingMandatoryValue;
-        }
-        // TODO: SHAPE BUILDER...
-        switch (shape_type) {
-            .ImplicitSphere => {},
-            .CameraPersp => {},
-            .LightOmni => {},
         }
     }
 

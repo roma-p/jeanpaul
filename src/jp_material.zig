@@ -9,6 +9,10 @@ pub const MaterialTypeId = enum {
     Lambert,
 };
 
+pub const MaterialTypeIdArray = [_]MaterialTypeId{
+    .Lambert,
+};
+
 const Material = union(MaterialTypeId) {
     Lambert: *MatLambert,
 };

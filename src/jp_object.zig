@@ -12,6 +12,12 @@ pub const ShapeTypeId = enum {
     LightOmni,
 };
 
+pub const ShapeTypeIdArray = [_]ShapeTypeId{
+    .ImplicitSphere,
+    .CameraPersp,
+    .LightOmni,
+};
+
 pub const JpObjectCategory = enum {
     Camera,
     Light,

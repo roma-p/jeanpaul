@@ -32,16 +32,25 @@ pub const TypeNotFound = error{
 
 // OBJECT HELPERS ------------------------------------------------------------
 
-pub fn get_shape_id_from_str(str: []const u8) TypeNotFound!ShapeTypeId {
-    switch (str) {
-        @tagName(ShapeTypeId.ImplicitSphere) => return ShapeTypeId.ImplicitSphere,
-        @tagName(ShapeTypeId.CameraPersp) => return ShapeTypeId.CameraPersp,
-        @tagName(ShapeTypeId.LightOmni) => return ShapeTypeId.LightOmni,
-        else => return TypeNotFound.ShapeTypeNotFound,
+pub fn get_shape_id_from_str(str: []const u8) !ShapeTypeId {
+    if (str.len + 1 < STR_ID_OBJECT.len) {
+        return TypeNotFound.NotShapeType;
     }
+    if (!std.mem.eql(u8, str[0 .. STR_ID_OBJECT.len + 1], STR_ID_OBJECT ++ ".")) {
+        return TypeNotFound.NotShapeType;
+    }
+    const shape_type = str[STR_ID_OBJECT.len + 1 .. str.len];
+
+    for (jp_material.ShapeTypeIdArray) |i_shape_type| {
+        if (std.mem.eql(u8, shape_type, @tagName(i_shape_type))) {
+            return i_shape_type;
+        }
+    }
+    return TypeNotFound.MaterialTypeNotFound;
 }
 
 pub fn get_str_from_shape_id(shape_type: ShapeTypeId) []u8 {
+    //FIXME: missing "material."
     return @tagName(shape_type);
 }
 
@@ -55,13 +64,16 @@ pub fn get_material_id_from_str(str: []const u8) TypeNotFound!MaterialTypeId {
         return TypeNotFound.NotMaterialType;
     }
     const mat_type = str[STR_ID_MATERIAL.len + 1 .. str.len];
-    if (std.mem.eql(u8, mat_type, @tagName(MaterialTypeId.Lambert))) {
-        return MaterialTypeId.Lambert;
-    } else {
-        return TypeNotFound.MaterialTypeNotFound;
+
+    for (jp_material.MaterialTypeIdArray) |i_mat_type| {
+        if (std.mem.eql(u8, mat_type, @tagName(i_mat_type))) {
+            return MaterialTypeId.Lambert;
+        }
     }
+    return TypeNotFound.MaterialTypeNotFound;
 }
 
 pub fn get_str_from_material_id(material_type: MaterialTypeId) []u8 {
+    //FIXME: missing "material."
     return STR_ID_MATERIAL ++ "." ++ @tagName(material_type);
 }

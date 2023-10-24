@@ -1,9 +1,11 @@
 const std = @import("std");
 const jpp_parser = @import("jpp_parser.zig");
+const jpp_format = @import("jpp_format.zig");
 const jp_scene = @import("jp_scene.zig");
 
 const JppParser = jpp_parser.JppParser;
 const ErrorParsingJPP = jpp_parser.ErrorParsingJPP;
+const TypeNotFound = jpp_format.TypeNotFound;
 
 test "valid_jpp_file" {
     _ = try JppParser.parse("etc/jpp_example.jpp");
@@ -63,5 +65,12 @@ test "wrong_color" {
     _ = try std.testing.expectError(
         ErrorParsingJPP.WrongType,
         JppParser.parse("etc/jpp_unvalid_color_def_2.jpp"),
+    );
+}
+
+test "unknown_material_type" {
+    _ = try std.testing.expectError(
+        TypeNotFound.MaterialTypeNotFound,
+        JppParser.parse("etc/jpp_unknown_material_type.jpp"),
     );
 }

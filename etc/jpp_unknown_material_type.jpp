@@ -1,0 +1,62 @@
+### Some info to be skipped.
+### Some more.
+
+scene
+{
+resolution ! V 2
+1920 1080
+render_camera "camera/name"
+}
+
+camera.persp
+{
+name "camera/name"
+focal_lenght 10
+field_of_view 60
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 0
+0 0 1 0
+0 0 0 1
+}
+
+implicit.sphere
+{
+name "somesphere"
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 0
+0 0 1 0
+0 0 0 1
+radius 5
+}
+
+light.omni
+{
+name "light1"
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 0
+0 0 1 0
+0 0 0 1
+color ! V 3
+1 0 0
+intensity 0.7
+}
+
+# com to skip...
+material.Lambert
+{
+name "lambert1"
+kd_intensity 0.45
+kd_color ! V 3
+1 0 0
+}
+
+material.error
+{
+name "error"
+kd_intensity 0.45
+kd_color ! V 3
+1 0 0
+}
