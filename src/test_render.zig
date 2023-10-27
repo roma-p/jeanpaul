@@ -28,7 +28,7 @@ test "get_focal_plane_center_on_valid_case" {
     const center = render.get_focal_plane_center(camera);
     try std.testing.expectEqual(center.x, 0);
     try std.testing.expectEqual(center.y, 0);
-    try std.testing.expectEqual(center.z, -10);
+    try std.testing.expectEqual(center.z, -30);
 }
 
 test "render.get_ray_direction_from_focal_plane_on_valid_case" {
@@ -53,7 +53,7 @@ test "render.get_ray_direction_from_focal_plane_on_valid_case" {
     );
     try std.testing.expectEqual(ray_direction_1.x, -14.5);
     try std.testing.expectEqual(ray_direction_1.y, -14.5);
-    try std.testing.expectEqual(ray_direction_1.z, 10);
+    try std.testing.expectEqual(ray_direction_1.z, -10);
 
     var ray_direction_2 = render.get_ray_direction_from_focal_plane(
         camera,
@@ -66,7 +66,7 @@ test "render.get_ray_direction_from_focal_plane_on_valid_case" {
     );
     try std.testing.expectEqual(ray_direction_2.x, 1.5);
     try std.testing.expectEqual(ray_direction_2.y, 5.5);
-    try std.testing.expectEqual(ray_direction_2.z, 10);
+    try std.testing.expectEqual(ray_direction_2.z, -10);
 }
 
 test "render_one_sphere_at_center" {

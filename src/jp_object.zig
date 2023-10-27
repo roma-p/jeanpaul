@@ -79,12 +79,11 @@ const ShapeSphere = struct {
 };
 
 const ShapeCamera = struct {
-    //TODO: use interface to add "get_category" and not duplicate infos...
     comptime object_category: JpObjectCategory = JpObjectCategory.Camera,
     DIRECTION: types.Vec3f32 = types.Vec3f32{
         .x = 0,
         .y = 0,
-        .z = 1,
+        .z = -1,
     },
     focal_length: f32 = 10,
     field_of_view: f32 = 60,

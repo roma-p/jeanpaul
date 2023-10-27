@@ -14,6 +14,5 @@ test "multiply_with_vec3" {
         .z = 6,
     };
     try tmatrix.set_position(&position_1);
-    const vec = tmatrix.multiply_with_vec3(&position_2);
-    vec.log_debug();
+    _ = tmatrix.multiply_with_vec3(&position_2);
 }

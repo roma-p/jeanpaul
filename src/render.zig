@@ -126,13 +126,10 @@ pub fn get_ray_direction_from_focal_plane(
 
 pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
     // camera.pos + camera.direction * focal_length
-
-    // TODO: TEST ME!
     const camera_direction = get_camera_direction(camera);
     var weighted_direction = camera_direction.product_scalar(
         camera.shape.CameraPersp.focal_length,
     );
-
     var position = camera.tmatrix.get_position();
     return position.sum_vector(&weighted_direction);
 }
