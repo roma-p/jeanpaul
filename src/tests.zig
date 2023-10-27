@@ -1,6 +1,7 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("test_types.zig");
     _ = @import("test_draw_2d.zig");
     _ = @import("test_jp_img.zig");
     _ = @import("test_jp_object.zig");

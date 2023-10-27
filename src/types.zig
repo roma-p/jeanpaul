@@ -59,6 +59,12 @@ pub const Vec3f32 = struct {
             .z = self.z / magnitude,
         };
     }
+
+    pub fn log_debug(self: *const Vec3f32) void {
+        std.debug.print("\n.x :{}", .{self.x});
+        std.debug.print("\n.y :{}", .{self.y});
+        std.debug.print("\n.z :{}\n", .{self.z});
+    }
 };
 
 // ==== 2D BOUNDING RECTANGLE ================================================
@@ -96,7 +102,7 @@ pub const TMatrixf32 = struct {
         self.m[2][3] = position.z;
     }
 
-    pub fn get_position(self: *const TMatrixf32) Vec3f32 {
+    pub fn get_position(self: *Self) Vec3f32 {
         return Vec3f32{
             .x = self.m[0][3],
             .y = self.m[1][3],
@@ -104,7 +110,7 @@ pub const TMatrixf32 = struct {
         };
     }
 
-    pub fn set_tmatrix(self: *const TMatrixf32, matrix: *[4][4]f32) void {
+    pub fn set_tmatrix(self: *Self, matrix: *[4][4]f32) void {
         for (matrix, 0..) |_, x| {
             for (matrix[x], 0..) |value, y| {
                 self.m[x][y] = value;
@@ -112,16 +118,13 @@ pub const TMatrixf32 = struct {
         }
     }
 
-    pub fn translate(
-        self: *const TMatrixf32,
-        position: *Vec3f32,
-    ) void {
+    pub fn translate(self: *Self, position: *Vec3f32) void {
         self.m[0][3] += position.x;
         self.m[1][3] += position.y;
         self.m[2][3] += position.z;
     }
 
-    pub fn multiply_with_vec3(self: *const TMatrixf32, vector: *Vec3f32) Vec3f32 {
+    pub fn multiply_with_vec3(self: *Self, vector: *Vec3f32) Vec3f32 {
         //FIXME: is thois correct x or y inversed or what?
         return Vec3f32{
             .x = self.m[0][0] * vector.x + self.m[0][1] * vector.y + self.m[0][2] * vector.z,

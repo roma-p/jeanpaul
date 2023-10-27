@@ -128,20 +128,17 @@ pub fn get_focal_plane_center(camera: *const jp_object.JpObject) types.Vec3f32 {
     // camera.pos + camera.direction * focal_length
 
     // TODO: TEST ME!
-    // const camera_direction = get_camera_direction(camera);
-    // var weighted_direction = camera_direction.product_scalar(
-    //     camera.shape.CameraPersp.focal_length,
-    // );
-
-    var weighted_direction = camera.shape.CameraPersp.direction.product_scalar(
+    const camera_direction = get_camera_direction(camera);
+    var weighted_direction = camera_direction.product_scalar(
         camera.shape.CameraPersp.focal_length,
     );
+
     var position = camera.tmatrix.get_position();
     return position.sum_vector(&weighted_direction);
 }
 
 pub fn get_camera_direction(camera: *const jp_object.JpObject) types.Vec3f32 {
     return camera.tmatrix.multiply_with_vec3(
-        camera.shape.CameraPersp.DIRECTION,
+        &camera.shape.CameraPersp.DIRECTION,
     ).normalize();
 }
