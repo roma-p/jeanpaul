@@ -49,7 +49,7 @@ pub fn shot_ray(
     for (scene.objects.items) |obj| {
         var does_intersect: bool = undefined;
 
-        switch (obj.object_category) {
+        switch (obj.get_category()) {
             .Camera => continue,
             .Mesh => unreachable, // not implemented but shall be...
             .Light => continue,

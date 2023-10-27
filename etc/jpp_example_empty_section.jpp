@@ -5,23 +5,27 @@ scene
 {
 resolution ! V 2
 1920 1080
-render_camera "camera/name"
+render_camera "camera_main"
 }
 
-camera.persp
+object.CameraPersp
 {
+name "camera_main"
 }
 
-implicit.sphere
+object.ImplicitSphere
 {
+name "somesphere"
+material "lambert1"
 }
 
-light.omni
+object.LightOmni
 {
+name "somelight"
 }
 
 # com to skip...
 material.Lambert
 {
-name "Lambert1"
+name "lambert1"
 }

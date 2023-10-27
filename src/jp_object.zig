@@ -37,7 +37,6 @@ pub const JpObject = struct {
     tmatrix: *types.TMatrixf32 = undefined,
     material: *jp_material.JpMaterial = undefined,
     shape: *Shape = undefined,
-    object_category: JpObjectCategory,
     name: []const u8,
 
     const Self = @This();
@@ -51,7 +50,6 @@ pub const JpObject = struct {
 
         obj.* = JpObject{
             .shape = undefined,
-            .object_category = undefined, // set by builder
             .tmatrix = tmatrix,
             .name = name,
         };
@@ -64,6 +62,12 @@ pub const JpObject = struct {
         self.tmatrix.delete();
         allocator.destroy(self.tmatrix);
         allocator.destroy(self);
+    }
+
+    pub fn get_category(self: *Self) JpObjectCategory {
+        switch (self.shape.*) {
+            inline else => |t| return t.object_category,
+        }
     }
 };
 
@@ -125,21 +129,18 @@ fn shape_builder(type_id: ShapeTypeId, jp_object: *JpObject) !void {
             var _actual_shape = try allocator.create(ShapeSphere);
             _actual_shape.* = ShapeSphere{};
             shape.* = Shape{ .ImplicitSphere = _actual_shape };
-            jp_object.object_category = _actual_shape.object_category;
         },
         // CAMERA ------------------------------------------------------------
         .CameraPersp => {
             var _actual_shape = try allocator.create(ShapeCamera);
             _actual_shape.* = ShapeCamera{};
             shape.* = Shape{ .CameraPersp = _actual_shape };
-            jp_object.object_category = _actual_shape.object_category;
         },
         // LIGHT -------------------------------------------------------------
         .LightOmni => {
             var _actual_shape = try allocator.create(ShapeLightOmni);
             _actual_shape.* = ShapeLightOmni{};
             shape.* = Shape{ .LightOmni = _actual_shape };
-            jp_object.object_category = _actual_shape.object_category;
         },
     }
     jp_object.shape = shape;

@@ -41,12 +41,12 @@ pub fn get_shape_id_from_str(str: []const u8) !ShapeTypeId {
     }
     const shape_type = str[STR_ID_OBJECT.len + 1 .. str.len];
 
-    for (jp_material.ShapeTypeIdArray) |i_shape_type| {
+    for (jp_object.ShapeTypeIdArray) |i_shape_type| {
         if (std.mem.eql(u8, shape_type, @tagName(i_shape_type))) {
             return i_shape_type;
         }
     }
-    return TypeNotFound.MaterialTypeNotFound;
+    return TypeNotFound.ShapeTypeNotFound;
 }
 
 pub fn get_str_from_shape_id(shape_type: ShapeTypeId) []u8 {

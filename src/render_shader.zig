@@ -17,7 +17,7 @@ pub fn render_lambert(
     defer hit.delete();
     for (scene.objects.items) |light| {
         defer hit.reset();
-        if (light.object_category != jp_object.JpObjectCategory.Light) continue;
+        if (light.get_category() != jp_object.JpObjectCategory.Light) continue;
 
         const vector_to_light: types.Vec3f32 = light.tmatrix.get_position().substract_vector(
             &position,

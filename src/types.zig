@@ -18,6 +18,10 @@ pub const Vec3f32 = struct {
     y: f32 = undefined,
     z: f32 = undefined,
 
+    pub fn check_is_equal(self: *const Vec3f32, vec: *const Vec3f32) bool {
+        return (self.x == vec.x and self.y == vec.y and self.z == vec.z);
+    }
+
     // TODO: rename scale anrold: "atVectorAPI"
     pub fn product_scalar(self: *const Vec3f32, x: f32) Vec3f32 {
         return Vec3f32{
@@ -124,6 +128,13 @@ pub const TMatrixf32 = struct {
             .y = self.m[1][0] * vector.x + self.m[1][1] * vector.y + self.m[1][2] * vector.z,
             .z = self.m[2][0] * vector.x + self.m[2][1] * vector.y + self.m[2][2] * vector.z,
         };
+    }
+
+    pub fn log_debug(self: *Self) void {
+        std.debug.print("\n{} {} {} {}", .{ self.m[0][0], self.m[0][1], self.m[0][2], self.m[0][3] });
+        std.debug.print("\n{} {} {} {}", .{ self.m[1][0], self.m[1][1], self.m[1][2], self.m[1][3] });
+        std.debug.print("\n{} {} {} {}", .{ self.m[2][0], self.m[2][1], self.m[2][2], self.m[2][3] });
+        std.debug.print("\n{} {} {} {}\n", .{ self.m[3][0], self.m[3][1], self.m[3][2], self.m[3][3] });
     }
 };
 

@@ -5,7 +5,7 @@ scene
 {
 resolution ! V 2
 1920 1080
-render_camera "camera_main"
+render_camera "existe_pas"
 }
 
 object.CameraPersp

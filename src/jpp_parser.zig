@@ -7,7 +7,9 @@ const jp_object = @import("jp_object.zig");
 const jp_material = @import("jp_material.zig");
 
 const ShapeTypeId = jp_object.ShapeTypeId;
+const JpObjectCategory = jp_object.JpObjectCategory;
 const MaterialTypeId = jp_material.MaterialTypeId;
+const JpSceneError = jp_scene.JpSceneError;
 
 const log = std.log;
 const fs = std.fs;
@@ -98,7 +100,6 @@ pub const JppParser = struct {
             }
         }
         try self.parsing_section_list.append(self.i_current_section);
-        // FIXME: DESTROY PARSING SECTION LIST!!
 
         // first iteration on parsing section -> looking for scene definition.
         var scene_found = false;
@@ -137,8 +138,62 @@ pub const JppParser = struct {
             try self.build_material(section, mat_type);
         }
         // third iteration on parsing section -> build all objects.
-        // reconnecting render camera.
+        for (self.parsing_section_list.items) |section| {
+            if (section.processed) continue;
+            const shape_type = jpp_format.get_shape_id_from_str(
+                section.section_type_name,
+            ) catch |err| {
+                switch (err) {
+                    jpp_format.TypeNotFound.NotShapeType => continue,
+                    jpp_format.TypeNotFound.ShapeTypeNotFound => {
+                        const err_str = try std.fmt.allocPrint(
+                            allocator,
+                            "shape type unknown: {s}",
+                            .{section.section_type_name},
+                        );
+                        defer allocator.free(err_str);
+                        JppParser.log_build_error(err_str, section.line);
+                        return err;
+                    },
+                    else => unreachable,
+                }
+            };
+            try self.build_object(section, shape_type);
+        }
 
+        // checking for unknown section.
+        var all_section_valid = true;
+        for (self.parsing_section_list.items) |section| {
+            if (section.processed) continue;
+            all_section_valid = false;
+            const err_str = try std.fmt.allocPrint(
+                allocator,
+                "unknown / unvalid section: {s}",
+                .{section.section_type_name},
+            );
+            defer allocator.free(err_str);
+            JppParser.log_build_error(err_str, section.line);
+        }
+        if (!all_section_valid) return ErrorParsingJPP.ParsingError;
+
+        // reconnecting render camera.
+        var render_camera = self.scene.get_object(
+            self.render_camera_name,
+        ) catch |err| {
+            switch (err) {
+                JpSceneError.ObjectNotFound => {
+                    std.log.err(
+                        "scene render camera not found: {s}",
+                        .{self.render_camera_name},
+                    );
+                    return err;
+                },
+                else => unreachable,
+            }
+        };
+        self.scene.render_camera = render_camera;
+
+        // FIXME: DESTROY PARSING SECTION LIST!!
         return self.scene;
     }
 
@@ -291,7 +346,7 @@ pub const JppParser = struct {
         try self.i_current_section.property_list.append(self.i_current_property);
     }
 
-    // ==> ParsingVector -----------------------------------------------------
+    // ==> ParsingMatrix -----------------------------------------------------
     fn state_ParsingMatrix(self: *Self) !void {
         var words = std.mem.split(u8, self.i_line, " ");
         const x_max = self.i_current_property.value.Matrix.x_size;
@@ -503,7 +558,7 @@ pub const JppParser = struct {
         self: *Self,
         parsed_section: *ParsingSection,
         shape_type: ShapeTypeId,
-    ) !*jp_scene.JpScene {
+    ) !void {
         parsed_section.processed = true;
 
         // 1 - build JpObject object and add it to scene!
@@ -527,21 +582,56 @@ pub const JppParser = struct {
             return err;
         };
 
-        // 2 - if tmatrix defined: copy paste it.
+        // 2 - if tmatrix defined: copy paste it. check for material.
+        var material_found = false;
         for (parsed_section.property_list.items) |property| {
             if (std.mem.eql(u8, property.name, "tmatrix")) {
+                property.processed = true;
                 try property.check_is_matrix(4, 4);
                 var i: usize = 0;
-                var j: usize = 0;
                 while (i < 4) : (i += 1) {
+                    var j: usize = 0;
                     while (j < 4) : (j += 1) {
-                        object.tmatrix.m[i][j] = property.value.Matrix.matrix[i][j];
+                        object.tmatrix.m[i][j] = property.value.Matrix.matrix[j][i];
                     }
                 }
+            } else if (std.mem.eql(u8, property.name, "material")) {
+                material_found = true;
+                property.processed = true;
+                try property.check_is_string();
+                var material = self.scene.get_material(property.value.String) catch |err| {
+                    const err_str = try std.fmt.allocPrint(
+                        allocator,
+                        "unable to find material '{s}' (object{s})",
+                        .{ property.value.String, name },
+                    );
+                    defer allocator.free(err_str);
+                    JppParser.log_build_error(err_str, parsed_section.line);
+                    return err;
+                };
+                object.material = material;
+            }
+        }
+        // 3 - check for material.
+        // only mendatory for shape and implicit.
+        if (!material_found) {
+            const cat: JpObjectCategory = object.get_category();
+            if (cat == JpObjectCategory.Mesh or
+                cat == JpObjectCategory.Implicit)
+            {
+                try JppParser.log_build_error_missing("material", parsed_section.line);
             }
         }
 
-        // 3 - call custom builder for each type.
+        // 4 - call custom builder for each type.
+        if (shape_type == ShapeTypeId.ImplicitSphere) {
+            try JppParser.build_object_implicitsphere(parsed_section, object);
+        } else if (shape_type == ShapeTypeId.CameraPersp) {
+            try JppParser.build_object_camerapersp(parsed_section, object);
+        } else if (shape_type == ShapeTypeId.LightOmni) {
+            try JppParser.build_object_lightomni(parsed_section, object);
+        }
+
         JppParser.log_all_unprocessed_properties(parsed_section);
     }
 
@@ -562,6 +652,58 @@ pub const JppParser = struct {
                 property.processed = true;
                 try property.check_is_number();
                 material.mat.Lambert.kd_intensity = property.value.Number;
+            }
+        }
+    }
+
+    fn build_object_implicitsphere(
+        parsed_section: *ParsingSection,
+        object: *jp_object.JpObject,
+    ) !void {
+        for (parsed_section.property_list.items) |property| {
+            if (property.processed) continue;
+            if (std.mem.eql(u8, property.name, "radius")) {
+                property.processed = true;
+                try property.check_is_number();
+                object.shape.ImplicitSphere.radius = property.value.Number;
+            }
+        }
+    }
+
+    fn build_object_camerapersp(
+        parsed_section: *ParsingSection,
+        object: *jp_object.JpObject,
+    ) !void {
+        for (parsed_section.property_list.items) |property| {
+            if (property.processed) continue;
+            if (std.mem.eql(u8, property.name, "focal_length")) {
+                property.processed = true;
+                try property.check_is_number();
+                object.shape.CameraPersp.focal_length = property.value.Number;
+            } else if (std.mem.eql(u8, property.name, "field_of_view")) {
+                property.processed = true;
+                try property.check_is_number();
+                object.shape.CameraPersp.field_of_view = property.value.Number;
+            }
+        }
+    }
+
+    fn build_object_lightomni(
+        parsed_section: *ParsingSection,
+        object: *jp_object.JpObject,
+    ) !void {
+        for (parsed_section.property_list.items) |property| {
+            if (property.processed) continue;
+            if (std.mem.eql(u8, property.name, "intensity")) {
+                property.processed = true;
+                try property.check_is_number();
+                object.shape.LightOmni.intensity = property.value.Number;
+            } else if (std.mem.eql(u8, property.name, "color")) {
+                property.processed = true;
+                try property.check_is_color();
+                object.shape.LightOmni.color.r = property.value.Vector.vector[0];
+                object.shape.LightOmni.color.g = property.value.Vector.vector[1];
+                object.shape.LightOmni.color.b = property.value.Vector.vector[2];
             }
         }
     }
@@ -603,11 +745,12 @@ pub const JppParser = struct {
         std.log.err("missing mandatory section: {s}", .{section_name});
     }
 
-    fn log_build_error_missing(section_name: []const u8, line: u16) !void {
+    // TODO: add section name as well as property name fo better report.
+    fn log_build_error_missing(property_name: []const u8, line: u16) !void {
         const err_str = try std.fmt.allocPrint(
             allocator,
             "missing mandatory property: {s}",
-            .{section_name},
+            .{property_name},
         );
         defer allocator.free(err_str);
         JppParser.log_build_error(err_str, line);

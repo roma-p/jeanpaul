@@ -19,7 +19,7 @@ pub const JpScene = struct {
     objects: std.ArrayList(*jp_object.JpObject),
     materials: std.ArrayList(*jp_material.JpMaterial),
     resolution: types.Vec2u16 = types.Vec2u16{ .x = 640, .y = 480 },
-    render_camera: jp_object.JpObject,
+    render_camera: *jp_object.JpObject,
 
     const Self = @This();
 
@@ -73,7 +73,7 @@ pub const JpScene = struct {
     }
 
     pub fn get_object(self: *Self, name: []const u8) JpSceneError!*jp_object.JpObject {
-        for (self.objets.items) |o| {
+        for (self.objects.items) |o| {
             if (std.mem.eql(u8, o.name, name)) {
                 return o;
             }
