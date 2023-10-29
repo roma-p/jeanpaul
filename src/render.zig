@@ -17,6 +17,7 @@ pub fn render_to_path(
     scene: *jp_scene.JpScene,
     filename: []const u8,
 ) !void {
+    std.log.info("rendering to: {s}", .{filename});
     var img = try jp_img.JpImg.new(scene.resolution.x, scene.resolution.y);
     defer img.delete();
 

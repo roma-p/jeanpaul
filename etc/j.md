@@ -1,7 +1,7 @@
 ---
 
-- 1 gerer la direction de la camera en 001,
-- 2 changer en 00-1 et corriger les rendus.
+x 1 gerer la direction de la camera en 001,
+x 2 changer en 00-1 et corriger les rendus.
 - 3 CLI !
 - 4 on peut passer à la 3D.
 
