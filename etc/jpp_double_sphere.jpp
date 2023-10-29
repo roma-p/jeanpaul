@@ -1,0 +1,71 @@
+scene
+{
+resolution ! V 2
+480 360
+render_camera "camera_main"
+}
+
+object.CameraPersp
+{
+name "camera_main"
+focal_length 10
+field_of_view 60
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 0
+0 0 1 30
+0 0 0 1
+}
+
+# object.ImplicitSphere
+# {
+# name "sphere_red"
+# radius 10
+# material "red"
+# tmatrix ! M 4 4
+# 1 0 0 0
+# 0 1 0 0
+# 0 0 1 0
+# 0 0 0 1
+# }
+
+object.ImplicitSphere
+{
+name "sphere_blue"
+radius 5
+material "blue"
+tmatrix ! M 4 4
+1 0 0 4
+0 1 0 3
+0 0 1 4
+0 0 0 1
+}
+
+object.LightOmni
+{
+name "light1"
+tmatrix ! M 4 4
+1 0 0 -20
+0 1 0 5
+0 0 1 15
+0 0 0 1
+color ! V 3
+1 0 0
+intensity 0.7
+}
+
+material.Lambert
+{
+name "red"
+kd_intensity 0.45
+kd_color ! V 3
+1 0 0
+}
+
+material.Lambert
+{
+name "blue"
+kd_intensity 0.45
+kd_color ! V 3
+0 0 1
+}

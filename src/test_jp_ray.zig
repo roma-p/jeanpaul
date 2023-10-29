@@ -77,3 +77,32 @@ test "render.check_ray_hit_implicit_sphere_basic_test" {
     );
     try std.testing.expectEqual(intersect_3, false);
 }
+
+// test "render.check_ray_hit_light_omni" {
+//     var camera = try JpObject.new("camera", ShapeTypeId.CameraPersp);
+//     defer camera.delete();
+//     camera.shape.CameraPersp.focal_length = 10;
+//     try camera.tmatrix.set_position(&types.Vec3f32{
+//         .x = 0,
+//         .y = 0,
+//         .z = 20,
+//     });
+//
+//     const origin_position = types.Vec3f32{ .x = 0, .y = 0, .z = 0 };
+//     const light_position = types.Vec3f32{ .x = 0, .y = 0, .z = 10 };
+//
+//     var hit = try jp_ray.JpRayHit.new();
+//     defer hit.delete();
+//
+//     const vector_to_light = light_pos.substract_vector(&origin_position);
+//     const does_intersect = try jp_ray.shot_ray(origin_position, hit, vector_to_light, scene);
+//
+//     _ = try jp_ray.check_ray_hit_light_omni(
+//         light_position,
+//         origin_position,
+//         light_position,
+//         &intersect_ray_multiplier,
+//     );
+//
+//     std.log.err(" ==== >> {d}", .{intersect_ray_multiplier});
+// }

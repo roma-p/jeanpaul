@@ -13,26 +13,17 @@ pub fn render_lambert(
     scene: *jp_scene.JpScene,
 ) !jp_color.JpColor {
     var light_color = jp_color.JpColor{ .r = 0, .g = 0, .b = 0 };
-    var hit = try jp_ray.JpRayHit.new();
-    defer hit.delete();
     for (scene.objects.items) |light| {
-        defer hit.reset();
         if (light.get_category() != jp_object.JpObjectCategory.Light) continue;
 
-        const vector_to_light: types.Vec3f32 = light.tmatrix.get_position().substract_vector(
-            &position,
-        );
+        const light_pos = light.tmatrix.get_position();
 
-        const does_intersect = try jp_ray.shot_ray(
+        const is_reachable = try jp_ray.is_point_reachable_by_ray(
             position,
-            hit,
-            vector_to_light,
+            light_pos,
             scene,
         );
-
-        if (does_intersect and hit.distance < 0) {
-            continue;
-        }
+        if (!is_reachable) continue;
 
         _ = normal;
         light_color = light_color.sum_color(material.mat.Lambert.kd_color);

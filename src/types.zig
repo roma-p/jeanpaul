@@ -1,6 +1,8 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 
+pub const JP_EPSILON: f32 = 0.0000001;
+
 // ==== VECTORS ==============================================================
 
 pub const Vec2u16 = struct {
@@ -147,8 +149,6 @@ const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
     [_]f32{ 0, 0, 1, 0 },
     [_]f32{ 0, 0, 0, 1 },
 };
-
-pub const JP_EPSILON = 0.000001;
 
 // ==== RUN TIME RAW MATRIX / VECTOR =========================================
 

@@ -58,13 +58,13 @@ pub fn render(
                 zig_utils.cast_u16_to_f32(_y),
             );
             var _hit: jp_ray.JpRayHit = undefined;
-            var _intersect_one_obj = try jp_ray.shot_ray(
+            var _intersect_one_obj = try jp_ray.shot_ray_on_physical_objects(
                 camera_position,
                 &_hit,
                 _ray_direction,
                 scene,
             );
-            if (_intersect_one_obj == false) {
+            if (!_intersect_one_obj) {
                 _hit = undefined;
                 continue;
             }
