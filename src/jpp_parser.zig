@@ -51,12 +51,18 @@ pub const JppParser = struct {
     const Self = @This();
 
     pub fn parse(file_path: []const u8) !*jp_scene.JpScene {
+        std.log.info("parsing jpp file: {s}", .{file_path});
 
         // instiating self.
         var parsing_section_list = try std.ArrayList(
             *ParsingSection,
         ).initCapacity(allocator, 15);
-        defer parsing_section_list.deinit();
+        defer {
+            for (parsing_section_list.items) |section| {
+                section.delete();
+            }
+            parsing_section_list.deinit();
+        }
 
         var self = try allocator.create(Self);
         defer allocator.destroy(self);
@@ -745,7 +751,6 @@ pub const JppParser = struct {
         std.log.err("missing mandatory section: {s}", .{section_name});
     }
 
-    // TODO: add section name as well as property name fo better report.
     fn log_build_error_missing(property_name: []const u8, line: u16) !void {
         const err_str = try std.fmt.allocPrint(
             allocator,
@@ -800,7 +805,9 @@ const ParsingSection = struct {
     }
 
     pub fn delete(self: *Self) void {
-        // FIXME: delete properties !!!!
+        for (self.property_list.items) |property| {
+            property.delete();
+        }
         allocator.free(self.section_type_name);
         self.property_list.deinit();
         allocator.destroy(self);
@@ -885,7 +892,7 @@ const ParsingProperty = struct {
     }
 
     pub fn delete(self: *Self) void {
-        switch (self.value) {
+        switch (self.value.*) {
             .Matrix => self.value.Matrix.delete(),
             .Vector => self.value.Vector.delete(),
             .String => allocator.free(self.value.String),
@@ -1058,7 +1065,7 @@ const ParsingPropertyMatrix = struct {
     }
 
     pub fn delete(self: *Self) void {
-        types.matrix_f32_delete(self.matrix);
+        types.matrix_f32_delete(&self.matrix);
         allocator.destroy(self);
     }
 };
@@ -1079,7 +1086,7 @@ const ParsingPropertyVector = struct {
     }
 
     pub fn delete(self: *Self) void {
-        types.vector_f32_delete(self.vector);
+        types.vector_f32_delete(&self.vector);
         allocator.destroy(self);
     }
 };
