@@ -67,7 +67,7 @@ pub fn get_material_id_from_str(str: []const u8) TypeNotFound!MaterialTypeId {
 
     for (jp_material.MaterialTypeIdArray) |i_mat_type| {
         if (std.mem.eql(u8, mat_type, @tagName(i_mat_type))) {
-            return MaterialTypeId.Lambert;
+            return i_mat_type;
         }
     }
     return TypeNotFound.MaterialTypeNotFound;

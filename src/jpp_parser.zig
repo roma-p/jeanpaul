@@ -242,7 +242,6 @@ pub const JppParser = struct {
             );
             defer allocator.free(err_str);
             self.exit_state_in_err(err_str);
-            return; //FIXME: not sure...
         }
         self.i_state = ParsingState.ParsingSectionProperty;
     }
@@ -556,6 +555,8 @@ pub const JppParser = struct {
         // 2 - call custom builder for each type.
         if (material_type == MaterialTypeId.Lambert) {
             try JppParser.build_material_lambert(parsed_section, material);
+        } else if (material_type == MaterialTypeId.AovAlpha) {
+            try JppParser.build_material_aov_alpha(parsed_section, material);
         }
         JppParser.log_all_unprocessed_properties(parsed_section);
     }
@@ -658,6 +659,22 @@ pub const JppParser = struct {
                 property.processed = true;
                 try property.check_is_number();
                 material.mat.Lambert.kd_intensity = property.value.Number;
+            }
+        }
+    }
+
+    fn build_material_aov_alpha(
+        parsed_section: *ParsingSection,
+        material: *jp_material.JpMaterial,
+    ) !void {
+        for (parsed_section.property_list.items) |property| {
+            if (property.processed) continue;
+            if (std.mem.eql(u8, property.name, "color")) {
+                property.processed = true;
+                try property.check_is_color();
+                material.mat.AovAlpha.color.r = property.value.Vector.vector[0];
+                material.mat.AovAlpha.color.g = property.value.Vector.vector[1];
+                material.mat.AovAlpha.color.b = property.value.Vector.vector[2];
             }
         }
     }

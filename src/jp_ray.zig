@@ -9,29 +9,41 @@ const allocator = std.heap.page_allocator;
 
 pub const JpRayHit = struct {
     object: *jp_object.JpObject,
-    position: types.Vec3f32,
-    distance: f32,
+    position: *types.Vec3f32,
+    distance: *f32,
 
     const Self = @This();
 
     pub fn new() !*Self {
+        var position = try allocator.create(types.Vec3f32);
+        errdefer allocator.destroy(position);
+        position.* = types.Vec3f32{ .x = 0, .y = 0, .z = 0 };
+
+        var distance = try allocator.create(f32);
+        errdefer allocator.destroy(distance);
+        distance.* = 0;
+
         var jp_ray_intersection = try allocator.create(Self);
         jp_ray_intersection.* = Self{
             .object = undefined,
-            .position = undefined,
-            .distance = undefined,
+            .position = position,
+            .distance = distance,
         };
         return jp_ray_intersection;
     }
 
     pub fn delete(self: *Self) void {
+        allocator.destroy(self.position);
+        allocator.destroy(self.distance);
         allocator.destroy(self);
     }
 
     pub fn reset(self: *Self) void {
         self.object = undefined;
-        self.position = undefined;
-        self.distance = undefined;
+        self.position.x = 0;
+        self.position.y = 0;
+        self.position.z = 0;
+        self.distance.* = 0;
     }
 };
 
@@ -42,7 +54,7 @@ pub fn shot_ray_on_physical_objects(
     scene: *jp_scene.JpScene,
 ) !bool {
     var _intersect_one_obj: bool = false;
-    var _intersect_object: jp_object.JpObject = undefined;
+    var _intersect_object: *jp_object.JpObject = undefined;
     var _t_min: f32 = 0;
     var _t_current: f32 = undefined;
 
@@ -67,7 +79,7 @@ pub fn shot_ray_on_physical_objects(
 
         _intersect_one_obj = true;
         if (_t_min == 0 or _t_current < _t_min) {
-            _intersect_object = obj.*;
+            _intersect_object = obj;
             _t_min = _t_current;
         }
     }
@@ -76,13 +88,11 @@ pub fn shot_ray_on_physical_objects(
         return false;
     }
 
-    intersection.* = JpRayHit{
-        .object = &_intersect_object,
-        .position = ray_direction.product_scalar(_t_min).sum_vector(
-            &origin_position,
-        ),
-        .distance = _t_min,
-    };
+    intersection.*.object = _intersect_object;
+    intersection.*.position.* = ray_direction.product_scalar(_t_min).sum_vector(
+        &origin_position,
+    );
+    intersection.distance.* = _t_min;
     return true;
 }
 
@@ -200,10 +210,11 @@ pub fn check_ray_hit_implicit_sphere(
 
     if (t0 > t1 and t1 > types.JP_EPSILON) {
         t = t1;
-    } else {
+    } else if (t0 > types.JP_EPSILON) {
         t = t0;
+    } else {
+        return false;
     }
-
     intersect_ray_multiplier.* = t;
     return true;
 }

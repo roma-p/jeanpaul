@@ -7,14 +7,20 @@ const jp_color = @import("jp_color.zig");
 
 pub const MaterialTypeId = enum {
     Lambert,
+    AovAlpha,
+    AovNormal,
 };
 
 pub const MaterialTypeIdArray = [_]MaterialTypeId{
     .Lambert,
+    .AovAlpha,
+    .AovNormal,
 };
 
 const Material = union(MaterialTypeId) {
     Lambert: *MatLambert,
+    AovAlpha: *MatAovAlpha,
+    AovNormal: *MatAovNormal,
 };
 
 // ==== JpMaterial ===========================================================
@@ -36,9 +42,20 @@ pub const JpMaterial = struct {
             .Lambert => {
                 var actual_mat = try allocator.create(MatLambert);
                 errdefer allocator.destroy(actual_mat);
-
                 actual_mat.* = MatLambert{};
                 mat.* = Material{ .Lambert = actual_mat };
+            },
+            .AovAlpha => {
+                var actual_mat = try allocator.create(MatAovAlpha);
+                errdefer allocator.destroy(actual_mat);
+                actual_mat.* = MatAovAlpha{};
+                mat.* = Material{ .AovAlpha = actual_mat };
+            },
+            .AovNormal => {
+                var actual_mat = try allocator.create(MatAovNormal);
+                errdefer allocator.destroy(actual_mat);
+                actual_mat.* = MatAovNormal{};
+                mat.* = Material{ .AovNormal = actual_mat };
             },
         }
         jpmat.mat = mat;
@@ -49,6 +66,8 @@ pub const JpMaterial = struct {
     pub fn delete(self: *Self) void {
         switch (self.mat.*) {
             .Lambert => allocator.destroy(self.mat.Lambert),
+            .AovAlpha => allocator.destroy(self.mat.AovAlpha),
+            .AovNormal => allocator.destroy(self.mat.AovNormal),
         }
         allocator.destroy(self.mat);
         allocator.destroy(self);
@@ -59,9 +78,14 @@ pub const JpMaterial = struct {
 
 pub const MatLambert = struct {
     kd_color: jp_color.JpColor = jp_color.JP_COLOR_DEFAULT,
-    //FIXME: kd_intensity not used!
     kd_intensity: f32 = 0.7,
 };
+
+pub const MatAovAlpha = struct {
+    color: jp_color.JpColor = jp_color.JP_COLOR_DEFAULT,
+};
+
+pub const MatAovNormal = struct {};
 
 // ==== HELPERS ==============================================================
 

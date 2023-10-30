@@ -25,17 +25,28 @@ pub fn render_lambert(
         );
         if (!is_reachable) continue;
 
-        _ = normal;
-        light_color = light_color.sum_color(material.mat.Lambert.kd_color);
+        const vector_to_light = light.tmatrix.get_position().substract_vector(&position);
+        const vector_to_light_normalised = vector_to_light.normalize();
+        const attenuation_factor = vector_to_light_normalised.product_dot(&normal);
 
-        // const vector_to_light_normalised = vector_to_light.normalize();
-        // const attenuation_factor = vector_to_light_normalised.product_dot(&normal);
-        //
-        // TODO MULITPLY !!
-        // var single_light_contribution = material.mat.Lambert.diffuse.sum_color(light.shape.LightOmni.color);
-        // single_light_contribution = single_light_contribution.multiply(attenuation_factor);
-        // light_color = light_color.sum_color(single_light_contribution);
-
+        var light_contribution = material.mat.Lambert.kd_color;
+        light_contribution = light_contribution.multiply(attenuation_factor);
+        light_contribution = light_contribution.multiply(material.mat.Lambert.kd_intensity);
+        light_contribution = light_contribution.multiply(light.shape.LightOmni.intensity);
+        light_contribution = light_contribution.multiply_with_other_color(&light.shape.LightOmni.color);
+        light_color = light_color.sum_color(light_contribution);
     }
     return light_color;
+}
+
+pub fn render_aov_alpha(material: *jp_material.JpMaterial) !jp_color.JpColor {
+    return material.mat.AovAlpha.color;
+}
+
+pub fn render_aov_normal(normal: types.Vec3f32) !jp_color.JpColor {
+    return jp_color.JpColor{
+        .r = (normal.x + 1) / 2,
+        .g = (normal.y + 1) / 2,
+        .b = (normal.z + 1) / 2,
+    };
 }

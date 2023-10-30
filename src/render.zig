@@ -45,6 +45,9 @@ pub fn render(
     var _x: u16 = 0;
     var _y: u16 = undefined;
 
+    var _hit = try jp_ray.JpRayHit.new();
+    defer _hit.delete();
+
     while (_x < img.width) : (_x += 1) {
         _y = img.height - 1;
         while (_y != 0) : (_y -= 1) {
@@ -57,34 +60,34 @@ pub fn render(
                 zig_utils.cast_u16_to_f32(_x),
                 zig_utils.cast_u16_to_f32(_y),
             );
-            var _hit: jp_ray.JpRayHit = undefined;
             var _intersect_one_obj = try jp_ray.shot_ray_on_physical_objects(
                 camera_position,
-                &_hit,
+                _hit,
                 _ray_direction,
                 scene,
             );
             if (!_intersect_one_obj) {
-                _hit = undefined;
                 continue;
             }
 
             var object: jp_object.JpObject = _hit.object.*;
-            const position: types.Vec3f32 = _hit.position;
+            const position: types.Vec3f32 = _hit.position.*;
             const normal = jp_object.get_normal_at_position(&object, position);
 
-            var color_at_px: jp_color.JpColor = undefined;
+            var color_at_px: jp_color.JpColor = jp_color.JP_COLOR_EMPTY;
             switch (_hit.object.material.mat.*) {
                 .Lambert => color_at_px = try render_shader.render_lambert(
-                    _hit.position,
+                    position,
                     normal,
                     object.material,
                     scene,
                 ),
+                .AovAlpha => color_at_px = try render_shader.render_aov_alpha(
+                    object.material,
+                ),
+                .AovNormal => color_at_px = try render_shader.render_aov_normal(normal),
             }
             try img.image_draw_at_px(_x, _y, color_at_px);
-            _hit = undefined;
-            color_at_px = undefined;
         }
     }
 }

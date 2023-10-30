@@ -21,6 +21,17 @@ pub const JpColor = struct {
             .b = self.b + color.b,
         };
     }
+
+    pub fn multiply_with_other_color(
+        self: *const JpColor,
+        color: *const JpColor,
+    ) JpColor {
+        return JpColor{
+            .r = self.r * color.r,
+            .g = self.g * color.g,
+            .b = self.b * color.b,
+        };
+    }
 };
 
 pub const JP_COLOR_BlACK = JpColor{ .r = 0, .g = 0, .b = 0 };
@@ -30,6 +41,7 @@ pub const JP_COLOR_GREEN = JpColor{ .r = 0, .g = 1, .b = 0 };
 pub const JP_COLOR_BLUE = JpColor{ .r = 0, .g = 0, .b = 1 };
 pub const JP_COLOR_GREY = JpColor{ .r = 0.5, .g = 0.5, .b = 0.5 };
 
+pub const JP_COLOR_EMPTY = JpColor{ .r = 0.5, .g = 0, .b = 0.5 };
 pub const JP_COLOR_DEFAULT = JP_COLOR_GREY;
 
 pub fn cast_jp_color_to_u8(color_value: f32) u8 {
