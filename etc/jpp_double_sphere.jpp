@@ -17,25 +17,25 @@ tmatrix ! M 4 4
 0 0 0 1
 }
 
-# object.ImplicitSphere
-# {
-# name "sphere_red"
-# radius 10
-# material "red"
-# tmatrix ! M 4 4
-# 1 0 0 0
-# 0 1 0 0
-# 0 0 1 0
-# 0 0 0 1
-# }
+object.ImplicitSphere
+{
+name "sphere_red"
+radius 10
+material "lambert_red"
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 0
+0 0 1 0
+0 0 0 1
+}
 
 object.ImplicitSphere
 {
 name "sphere_blue"
 radius 5
-material "blue"
+material "lambert_blue"
 tmatrix ! M 4 4
-1 0 0 4
+1 0 0 7
 0 1 0 3
 0 0 1 4
 0 0 0 1
@@ -45,27 +45,43 @@ object.LightOmni
 {
 name "light1"
 tmatrix ! M 4 4
-1 0 0 -20
-0 1 0 5
-0 0 1 15
+1 0 0 20
+0 1 0 1
+0 0 1 20
 0 0 0 1
 color ! V 3
-1 0 0
-intensity 0.7
+1 1 1
+intensity 1
 }
+
+# MATERIALS ------------------------------------------------------------------
 
 material.Lambert
 {
-name "red"
-kd_intensity 0.45
+name "lambert_red"
+kd_intensity 0.7
 kd_color ! V 3
 1 0 0
 }
 
 material.Lambert
 {
-name "blue"
-kd_intensity 0.45
+name "lambert_blue"
+kd_intensity 0.7
 kd_color ! V 3
 0 0 1
+}
+
+material.AovAlpha
+{
+name "alpha_blue"
+color ! V 3
+0 0 1
+}
+
+material.AovAlpha
+{
+name "alpha_red"
+color ! V 3
+1 0 0
 }

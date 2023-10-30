@@ -21,7 +21,7 @@ object.ImplicitSphere
 {
 name "somesphere"
 radius 10
-material "lambert1"
+material "normal"
 tmatrix ! M 4 4
 1 0 0 0
 0 1 0 0
@@ -48,4 +48,9 @@ name "lambert1"
 kd_intensity 0.45
 kd_color ! V 3
 1 0 0
+}
+
+material.AovNormal
+{
+name "normal"
 }
