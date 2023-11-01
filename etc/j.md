@@ -1,9 +1,17 @@
+
+x 1 multiplier color to fix...
+x 2 corriger normal map entre -1 et 1...
+- 3 plusieurs light?
+- 4 light decay: constant / quadratic.
+- 5 ajouter ambient.
+- 6 ajouter plan.
+
 ---
 
 x 1 gerer la direction de la camera en 001,
 x 2 changer en 00-1 et corriger les rendus.
-- 3 CLI !
-- 4 on peut passer à la 3D.
+x 3 CLI !
+x 4 on peut passer à la 3D.
 
 
 ---

@@ -51,7 +51,24 @@ tmatrix ! M 4 4
 0 0 0 1
 color ! V 3
 1 1 1
-intensity 1
+intensity 2
+exposition 8
+decay_rate "Quadratic"
+}
+
+object.LightOmni
+{
+name "light2"
+tmatrix ! M 4 4
+1 0 0 -19
+0 1 0 50
+0 0 1 0
+0 0 0 -20
+color ! V 3
+1 1 1
+intensity 0.5
+exposition 0
+decay_rate "NoDecay"
 }
 
 # MATERIALS ------------------------------------------------------------------
@@ -84,4 +101,9 @@ material.AovAlpha
 name "alpha_red"
 color ! V 3
 1 0 0
+}
+
+material.AovNormal
+{
+name "normal"
 }

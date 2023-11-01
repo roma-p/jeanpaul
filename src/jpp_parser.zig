@@ -660,6 +660,11 @@ pub const JppParser = struct {
                 try property.check_is_number();
                 material.mat.Lambert.kd_intensity = property.value.Number;
             }
+            if (std.mem.eql(u8, property.name, "kd_ambiant")) {
+                property.processed = true;
+                try property.check_is_number();
+                material.mat.Lambert.kd_ambiant = property.value.Number;
+            }
         }
     }
 
@@ -721,12 +726,31 @@ pub const JppParser = struct {
                 property.processed = true;
                 try property.check_is_number();
                 object.shape.LightOmni.intensity = property.value.Number;
+            } else if (std.mem.eql(u8, property.name, "exposition")) {
+                property.processed = true;
+                try property.check_is_number();
+                object.shape.LightOmni.exposition = property.value.Number;
             } else if (std.mem.eql(u8, property.name, "color")) {
                 property.processed = true;
                 try property.check_is_color();
                 object.shape.LightOmni.color.r = property.value.Vector.vector[0];
                 object.shape.LightOmni.color.g = property.value.Vector.vector[1];
                 object.shape.LightOmni.color.b = property.value.Vector.vector[2];
+            } else if (std.mem.eql(u8, property.name, "decay_rate")) {
+                property.processed = true;
+                try property.check_is_string();
+                const value = jpp_format.get_light_decay_rate_from_str(
+                    property.value.String,
+                ) catch |err| {
+                    if (err == jpp_format.TypeNotFound.LightDecayRayNotFound) {
+                        JppParser.log_build_error(
+                            "wrong decay rate value specified",
+                            property.line,
+                        );
+                    }
+                    return err;
+                };
+                object.shape.LightOmni.decay_rate = value;
             }
         }
     }

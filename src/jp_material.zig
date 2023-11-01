@@ -77,6 +77,7 @@ pub const JpMaterial = struct {
 // ==== Material Definition ==================================================
 
 pub const MatLambert = struct {
+    kd_ambiant: f32 = 0.06,
     kd_color: jp_color.JpColor = jp_color.JP_COLOR_DEFAULT,
     kd_intensity: f32 = 0.7,
 };

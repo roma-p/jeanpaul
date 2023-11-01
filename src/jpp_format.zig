@@ -3,6 +3,7 @@ const jp_object = @import("jp_object.zig");
 const jp_material = @import("jp_material.zig");
 
 const ShapeTypeId = jp_object.ShapeTypeId;
+const LightDecayRate = jp_object.LightDecayRate;
 const JpObjectCategory = jp_object.JpObjectCategory;
 const MaterialTypeId = jp_material.MaterialTypeId;
 
@@ -28,6 +29,7 @@ pub const TypeNotFound = error{
     NotShapeType,
     NotMaterialType,
     MaterialTypeNotFound,
+    LightDecayRayNotFound,
 };
 
 // OBJECT HELPERS ------------------------------------------------------------
@@ -52,6 +54,15 @@ pub fn get_shape_id_from_str(str: []const u8) !ShapeTypeId {
 pub fn get_str_from_shape_id(shape_type: ShapeTypeId) []u8 {
     //FIXME: missing "material."
     return @tagName(shape_type);
+}
+
+pub fn get_light_decay_rate_from_str(str: []const u8) !LightDecayRate {
+    if (std.mem.eql(u8, str, @tagName(jp_object.LightDecayRate.NoDecay))) {
+        return jp_object.LightDecayRate.NoDecay;
+    } else if (std.mem.eql(u8, str, @tagName(jp_object.LightDecayRate.Quadratic))) {
+        return jp_object.LightDecayRate.Quadratic;
+    }
+    return TypeNotFound.LightDecayRayNotFound;
 }
 
 // MATERIAL HELPERS ----------------------------------------------------------

@@ -31,6 +31,11 @@ pub const Shape = union(ShapeTypeId) {
     LightOmni: *ShapeLightOmni,
 };
 
+pub const LightDecayRate = enum {
+    NoDecay,
+    Quadratic,
+};
+
 // ==== JpObject ==============================================================
 
 pub const JpObject = struct {
@@ -78,6 +83,15 @@ const ShapeSphere = struct {
     radius: f32 = 10,
 };
 
+const ShapePlane = struct {
+    comptime object_category: JpObjectCategory = JpObjectCategory.Implicit,
+    DIRECTION: types.Vec3f32 = types.Vec3f32{
+        .x = 0,
+        .y = 1,
+        .z = 0,
+    },
+};
+
 const ShapeCamera = struct {
     comptime object_category: JpObjectCategory = JpObjectCategory.Camera,
     DIRECTION: types.Vec3f32 = types.Vec3f32{
@@ -87,13 +101,32 @@ const ShapeCamera = struct {
     },
     focal_length: f32 = 10,
     field_of_view: f32 = 60,
-    //FIXME: default direction is generally: 0, 0, -1
 };
 
 const ShapeLightOmni = struct {
     comptime object_category: JpObjectCategory = JpObjectCategory.Light,
     color: jp_color.JpColor = jp_color.JP_COLOR_GREY,
+    decay_rate: LightDecayRate = LightDecayRate.Quadratic,
     intensity: f32 = 0.7,
+    exposition: f32 = 0,
+
+    const Self = @This();
+
+    pub fn compute_intensity(self: *Self) f32 {
+        return self.intensity * std.math.pow(f32, 2, self.exposition);
+    }
+
+    pub fn compute_intensity_from_distance(self: *Self, distance: f32) f32 {
+        const intensity = self.compute_intensity();
+        var ret: f32 = undefined;
+        switch (self.decay_rate) {
+            .NoDecay => ret = intensity,
+            .Quadratic => {
+                ret = intensity / (distance * distance);
+            },
+        }
+        return ret;
+    }
 };
 
 // ==== HELPERS ==============================================================

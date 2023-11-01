@@ -62,6 +62,10 @@ pub const Vec3f32 = struct {
         };
     }
 
+    pub fn compute_length(self: *const Vec3f32) f32 {
+        return @sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+    }
+
     pub fn log_debug(self: *const Vec3f32) void {
         std.debug.print("\n.x :{}", .{self.x});
         std.debug.print("\n.y :{}", .{self.y});
