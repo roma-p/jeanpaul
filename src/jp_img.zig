@@ -108,9 +108,25 @@ pub const JpImg = struct {
         }
     }
 
-    pub fn image_draw_at_px(self: *Self, x: u16, y: u16, color: jp_color.JpColor) !void {
+    pub fn image_draw_at_px(
+        self: *Self,
+        x: u16,
+        y: u16,
+        color: jp_color.JpColor,
+    ) !void {
         self.r[x][y] = color.r;
         self.g[x][y] = color.g;
         self.b[x][y] = color.b;
+    }
+
+    pub fn image_add_at_px(
+        self: *Self,
+        x: u16,
+        y: u16,
+        color: jp_color.JpColor,
+    ) void {
+        self.r[x][y] += color.r;
+        self.g[x][y] += color.g;
+        self.b[x][y] += color.b;
     }
 };

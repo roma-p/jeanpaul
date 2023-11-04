@@ -32,6 +32,7 @@ pub fn render_lambert(
             scene,
         );
         if (!is_reachable) continue;
+        // _ = is_reachable;
 
         // computing diffuse pass.
 
@@ -46,9 +47,7 @@ pub fn render_lambert(
             },
         }
 
-        // FIXME: decay rate -> p
-        // qadratic not working...
-        // use complete intensity as ambiant.
+        // FIXME: use complete intensity as ambiant.
 
         const vector_to_light_normalised = vector_to_light.normalize();
         const attenuation_factor = vector_to_light_normalised.product_dot(&normal);

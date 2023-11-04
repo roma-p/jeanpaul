@@ -1,60 +1,68 @@
-### Some info to be skipped.
-### Some more.
-
 scene
 {
 resolution ! V 2
-1920 1080
+480 360
 render_camera "camera_main"
 }
 
 object.CameraPersp
 {
 name "camera_main"
-focal_length 13
+focal_length 10
 field_of_view 60
 tmatrix ! M 4 4
 1 0 0 0
 0 1 0 0
-0 0 1 0
+0 0 1 20
 0 0 0 1
 }
 
 object.ImplicitSphere
 {
 name "somesphere"
-radius 5
-material "lambert1"
-}
-
-object.LightOmni
-{
-name "light1"
+radius 6
+material "normal"
 tmatrix ! M 4 4
 1 0 0 0
 0 1 0 0
 0 0 1 0
 0 0 0 1
-color ! V 3
-1 0 0
-intensity 0.7
 }
 
-# com to skip...
+object.ImplicitPlane
+{
+name "someplane"
+material "normal"
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 -3
+0 0 1 0
+0 0 0 1
+}
+
+material.AovAlpha
+{
+name "alpha_green"
+color ! V 3
+0 1 0
+}
+
+material.AovAlpha
+{
+name "alpha_red"
+color ! V 3
+1 0 0
+}
+
 material.Lambert
 {
 name "lambert1"
 kd_intensity 0.45
 kd_color ! V 3
 1 0 0
-unknow_properties ! V 2 # does not exist, shall be logged and skipped.
-0 1
 }
 
-material.Lambert
+material.AovNormal
 {
-name "lambert2"
-kd_intensity 0.45
-kd_color ! V 3
-1 0 0
+name "normal"
 }

@@ -8,12 +8,14 @@ const allocator = std.heap.page_allocator;
 
 pub const ShapeTypeId = enum {
     ImplicitSphere,
+    ImplicitPlane,
     CameraPersp,
     LightOmni,
 };
 
 pub const ShapeTypeIdArray = [_]ShapeTypeId{
     .ImplicitSphere,
+    .ImplicitPlane,
     .CameraPersp,
     .LightOmni,
 };
@@ -27,6 +29,7 @@ pub const JpObjectCategory = enum {
 
 pub const Shape = union(ShapeTypeId) {
     ImplicitSphere: *ShapeSphere,
+    ImplicitPlane: *ShapePlane,
     CameraPersp: *ShapeCamera,
     LightOmni: *ShapeLightOmni,
 };
@@ -137,6 +140,11 @@ pub fn get_normal_at_position(obj: *JpObject, position: types.Vec3f32) types.Vec
         .ImplicitSphere => {
             normal = get_normal_point_at_position_sphere(obj, position);
         },
+        .ImplicitPlane => {
+            normal = obj.tmatrix.multiply_with_vec3(
+                &obj.shape.ImplicitPlane.DIRECTION,
+            ).normalize();
+        },
         else => unreachable,
     }
     return normal;
@@ -160,6 +168,12 @@ fn shape_builder(type_id: ShapeTypeId, jp_object: *JpObject) !void {
             _actual_shape.* = ShapeSphere{};
             shape.* = Shape{ .ImplicitSphere = _actual_shape };
         },
+        // IMPLICIT ----------------------------------------------------------
+        .ImplicitPlane => {
+            var _actual_shape = try allocator.create(ShapePlane);
+            _actual_shape.* = ShapePlane{};
+            shape.* = Shape{ .ImplicitPlane = _actual_shape };
+        },
         // CAMERA ------------------------------------------------------------
         .CameraPersp => {
             var _actual_shape = try allocator.create(ShapeCamera);
@@ -180,6 +194,7 @@ fn shape_deleter(jp_object: *JpObject) void {
     switch (jp_object.shape.*) {
         .CameraPersp => allocator.destroy(jp_object.shape.CameraPersp),
         .ImplicitSphere => allocator.destroy(jp_object.shape.ImplicitSphere),
+        .ImplicitPlane => allocator.destroy(jp_object.shape.ImplicitPlane),
         .LightOmni => allocator.destroy(jp_object.shape.LightOmni),
     }
     allocator.destroy(jp_object.shape);

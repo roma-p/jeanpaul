@@ -1,7 +1,7 @@
 scene
 {
 resolution ! V 2
-480 360
+1024 768
 render_camera "camera_main"
 }
 
@@ -11,9 +11,9 @@ name "camera_main"
 focal_length 10
 field_of_view 60
 tmatrix ! M 4 4
-1 0 0 0
+1 0 0 5
 0 1 0 0
-0 0 1 30
+0 0 1 47
 0 0 0 1
 }
 
@@ -21,7 +21,7 @@ object.ImplicitSphere
 {
 name "sphere_red"
 radius 10
-material "lambert_red"
+material "lambert_grey"
 tmatrix ! M 4 4
 1 0 0 0
 0 1 0 0
@@ -33,7 +33,7 @@ object.ImplicitSphere
 {
 name "sphere_blue"
 radius 5
-material "lambert_blue"
+material "lambert_grey"
 tmatrix ! M 4 4
 1 0 0 7
 0 1 0 3
@@ -41,16 +41,27 @@ tmatrix ! M 4 4
 0 0 0 1
 }
 
+object.ImplicitPlane
+{
+name "ground"
+material "lambert_grey"
+tmatrix ! M 4 4
+1 0 0 0
+0 1 0 -6
+0 0 1 0
+0 0 0 1
+}
+
 object.LightOmni
 {
-name "light1"
+name "yellow_light"
 tmatrix ! M 4 4
 1 0 0 20
-0 1 0 1
-0 0 1 20
+0 1 0 11
+0 0 1 12
 0 0 0 1
 color ! V 3
-1 1 1
+1 1 0.5
 intensity 2
 exposition 8
 decay_rate "Quadratic"
@@ -58,14 +69,14 @@ decay_rate "Quadratic"
 
 object.LightOmni
 {
-name "light2"
+name "violet_light"
 tmatrix ! M 4 4
 1 0 0 -19
 0 1 0 50
 0 0 1 0
-0 0 0 -20
+0 0 0 -9
 color ! V 3
-1 1 1
+1 0.5 1
 intensity 0.5
 exposition 0
 decay_rate "NoDecay"
@@ -87,6 +98,14 @@ name "lambert_blue"
 kd_intensity 0.7
 kd_color ! V 3
 0 0 1
+}
+
+material.Lambert
+{
+name "lambert_grey"
+kd_intensity 1
+kd_color ! V 3
+0.7 0.7 0.7
 }
 
 material.AovAlpha

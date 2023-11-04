@@ -105,6 +105,12 @@ pub fn is_point_reachable_by_ray(
 
     var _t_current: f32 = undefined;
     for (scene.objects.items) |obj| {
+        const category = obj.get_category();
+        if (category != jp_object.JpObjectCategory.Mesh and
+            category != jp_object.JpObjectCategory.Implicit)
+        {
+            continue;
+        }
         var does_intersect: bool = check_ray_hit(
             origin_position,
             ray_direction,
@@ -152,6 +158,18 @@ fn check_ray_hit(
                 _shift_origin_position,
                 obj.tmatrix.get_position(),
                 obj.shape.ImplicitSphere.radius,
+                t,
+            );
+        },
+        .ImplicitPlane => {
+            does_intersect = try check_ray_hit_implicit_plane(
+                ray_direction,
+                origin_position,
+                obj.tmatrix.get_position(),
+                jp_object.get_normal_at_position(
+                    obj,
+                    obj.tmatrix.get_position(),
+                ),
                 t,
             );
         },
@@ -218,6 +236,40 @@ pub fn check_ray_hit_implicit_sphere(
     intersect_ray_multiplier.* = t;
     return true;
 }
+
+pub fn check_ray_hit_implicit_plane(
+    ray_direction: types.Vec3f32,
+    ray_origin: types.Vec3f32,
+    plane_position: types.Vec3f32,
+    plane_normal: types.Vec3f32,
+    intersect_ray_multiplier: *f32,
+) !bool {
+    // - equation of the ray is : ray_origin + t * ray_direction = P
+    //   where t is a scalar and p a Vec3f32 position on the 3d space.
+    // - equation of the plane is: (P - plane_position) * plane_normal = 0
+    // therefore we want to resolve:
+    // (ray_origin + t * ray_direction - plane_position) * plane_normal = 0
+    // t * ray_direction * plane_normal  =  - (ray_origin - plane_position) * plane_normal
+    // t = ((plane_position - ray_origin) * plane_normal) / (ray_direction * plane_normal)
+
+    // no solution if ray_direction dot plane_normal == 0 (if theree are colinear, no intersection)
+    // we only consider t > 0.
+
+    const denominator = ray_direction.product_dot(&plane_normal);
+    if (denominator < types.JP_EPSILON and denominator > -types.JP_EPSILON) { // absolute!
+        return false;
+    }
+
+    var _tmp = plane_position.substract_vector(&ray_origin);
+    const numerator = _tmp.product_dot(&plane_normal);
+
+    const t: f32 = numerator / denominator;
+
+    if (t <= types.JP_EPSILON) return false;
+    intersect_ray_multiplier.* = t;
+    return true;
+}
+
 pub fn check_ray_hit_light_omni(
     ray_direction: types.Vec3f32,
     ray_origin: types.Vec3f32,

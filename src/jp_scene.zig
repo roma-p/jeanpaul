@@ -5,9 +5,6 @@ const jp_material = @import("jp_material.zig");
 const stdout = std.io.getStdOut().writer();
 const allocator = std.heap.page_allocator;
 
-// TODO: pas de séparation entre les objets, materiaux et caméras...
-// et donc! light hittable comme les autres! changer l'algo pour ça...
-
 pub const JpSceneError = error{
     AllocationError,
     NameNotAvailable,
@@ -19,6 +16,7 @@ pub const JpScene = struct {
     objects: std.ArrayList(*jp_object.JpObject),
     materials: std.ArrayList(*jp_material.JpMaterial),
     resolution: types.Vec2u16 = types.Vec2u16{ .x = 640, .y = 480 },
+    samples: i16 = 7,
     render_camera: *jp_object.JpObject,
 
     const Self = @This();
@@ -39,6 +37,12 @@ pub const JpScene = struct {
         self.objects.deinit();
         self.materials.deinit();
         allocator.destroy(self);
+    }
+
+    // MISC ------------------------------------------------------------------
+
+    pub fn get_samples_number(self: *Self) i16 {
+        return std.math.pow(i16, 2, self.samples);
     }
 
     // OBJETS MANAGEMENT -----------------------------------------------------
