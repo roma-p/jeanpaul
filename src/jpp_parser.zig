@@ -511,6 +511,11 @@ pub const JppParser = struct {
                     .y = @intFromFloat(property.value.Vector.vector[1]),
                 };
             }
+            if (std.mem.eql(u8, property.name, "samples")) {
+                try property.check_is_number();
+                const samples: i16 = @intFromFloat(property.value.Number);
+                scene.samples = samples;
+            }
         }
         if (!render_camera_defined) {
             try JppParser.log_build_error_missing("render_camera", parsed_section.line);

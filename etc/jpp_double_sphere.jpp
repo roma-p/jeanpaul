@@ -3,6 +3,7 @@ scene
 resolution ! V 2
 1024 768
 render_camera "camera_main"
+samples 3
 }
 
 object.CameraPersp
