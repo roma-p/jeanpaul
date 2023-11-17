@@ -1,4 +1,16 @@
 
+Perfo renderer empty (monothread): 
+ 1 - "implementation tous les AOV dans un px, 30 AOV max"
+  -> accé à tous les pixels pr tous les aov + écritures de tous les AOV, debug.
+  126s
+  -> accé à tous les pixels pr tous les aov, pas d'écriture de fichiers.
+  2.8s 
+  
+essayer en release mode.
+
+
+--- 
+
 x 1 multiplier color to fix...
 x 2 corriger normal map entre -1 et 1...
 - 3 plusieurs light?

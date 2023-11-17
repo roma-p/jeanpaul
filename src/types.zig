@@ -147,7 +147,7 @@ pub const TMatrixf32 = struct {
     }
 };
 
-const TRANSFORM_MATRIX_IDENTITY = [_][4]f32{
+const TRANSFORM_MATRIX_IDENTITY = [4][4]f32{
     [_]f32{ 1, 0, 0, 0 },
     [_]f32{ 0, 1, 0, 0 },
     [_]f32{ 0, 0, 1, 0 },
