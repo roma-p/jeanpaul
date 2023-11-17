@@ -79,22 +79,28 @@ pub const JpImg = struct {
         );
         defer file.close();
 
+        var file_writer = file.writer();
+        var buffer_writer = std.io.bufferedWriter(file_writer);
+        var writer = buffer_writer.writer();
+
         const header = try std.fmt.allocPrint(
             allocator,
             "P3\n{d} {d}\n255\n",
             .{ self.width, self.height },
         );
-        try file.writeAll(header);
         defer allocator.free(header);
+        try writer.writeAll(header);
 
         var _x: u16 = undefined;
         var _y: u16 = self.height;
 
+        var buffer_line: [256]u8 = undefined;
+
         while (_y > 0) : (_y -= 1) {
             _x = 0;
             while (_x < self.width) : (_x += 1) {
-                const line = try std.fmt.allocPrint(
-                    allocator,
+                const buffer_line_content = try std.fmt.bufPrint(
+                    &buffer_line,
                     "\n{} {} {}",
                     .{
                         jp_color.cast_jp_color_to_u8(self.r[_x][_y - 1]),
@@ -102,10 +108,10 @@ pub const JpImg = struct {
                         jp_color.cast_jp_color_to_u8(self.b[_x][_y - 1]),
                     },
                 );
-                try file.writeAll(line);
-                defer allocator.free(line);
+                try writer.writeAll(buffer_line_content);
             }
         }
+        try buffer_writer.flush();
     }
 
     pub fn image_draw_at_px(
