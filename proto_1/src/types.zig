@@ -71,6 +71,22 @@ pub const Vec3f32 = struct {
         std.debug.print("\n.y :{}", .{self.y});
         std.debug.print("\n.z :{}\n", .{self.z});
     }
+
+    pub fn gen_random_hemisphere_normalized(
+        self: *const Vec3f32,
+        rand_gen: *std.rand.DefaultPrng,
+    ) Vec3f32 {
+        var ret = Vec3f32{
+            .x = rand_gen.random().float(f32) * 2 - 1,
+            .y = rand_gen.random().float(f32) * 2 - 1,
+            .z = rand_gen.random().float(f32) * 2 - 1,
+        };
+        ret = ret.normalize();
+        if (self.product_dot(&ret) < JP_EPSILON) {
+            ret = ret.product_scalar(-1);
+        }
+        return ret;
+    }
 };
 
 // ==== 2D BOUNDING RECTANGLE ================================================

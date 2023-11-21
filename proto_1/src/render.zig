@@ -59,8 +59,7 @@ pub fn render(
         while (_y != 0) : (_y -= 1) {
             var _sample: usize = 0;
             while (_sample < sample_number) : (_sample += 1) {
-                var color_at_px = try render_pixel(
-                    scene,
+                var ray_direction = get_ray_direction_from_focal_plane(
                     camera,
                     focal_center,
                     img_width,
@@ -68,8 +67,17 @@ pub fn render(
                     pixel_size,
                     zig_utils.cast_u16_to_f32(_x),
                     zig_utils.cast_u16_to_f32(_y),
+                    &rnd,
+                );
+
+                var bounce_number: usize = 0;
+                var color_at_px = try render_pixel(
+                    scene,
+                    camera.tmatrix.get_position(),
+                    ray_direction,
                     _hit,
                     &rnd,
+                    &bounce_number,
                 );
 
                 color_at_px = color_at_px.multiply(inverted_sample_number);
@@ -81,54 +89,64 @@ pub fn render(
 
 pub fn render_pixel(
     scene: *jp_scene.JpScene,
-    camera: *jp_object.JpObject,
-    focal_center: types.Vec3f32,
-    img_width: f32,
-    img_height: f32,
-    pixel_size: f32,
-    x: f32,
-    y: f32,
+    ray_origin: types.Vec3f32,
+    ray_direction: types.Vec3f32,
     hit: *jp_ray.JpRayHit,
     rnd: *std.rand.DefaultPrng,
+    bounce_number: *usize,
 ) !jp_color.JpColor {
     var color_at_px: jp_color.JpColor = jp_color.JP_COLOR_BlACK;
 
-    var _ray_direction = get_ray_direction_from_focal_plane(
-        camera,
-        focal_center,
-        img_width,
-        img_height,
-        pixel_size,
-        x,
-        y,
-        rnd,
-    );
-    var _intersect_one_obj = try jp_ray.shot_ray_on_physical_objects(
-        camera.tmatrix.get_position(),
+    var intersect_one_obj = try jp_ray.shot_ray_on_physical_objects(
+        ray_origin,
         hit,
-        _ray_direction,
+        ray_direction,
         scene,
     );
-    if (!_intersect_one_obj) {
+    if (!intersect_one_obj) {
         return color_at_px;
     }
 
     var object: jp_object.JpObject = hit.object.*;
-    const position: types.Vec3f32 = hit.position.*;
-    const normal = jp_object.get_normal_at_position(&object, position);
+    var position: types.Vec3f32 = hit.position.*;
+    var normal = jp_object.get_normal_at_position(&object, position);
 
+    // if special shader, handled here. Otherwise if pbr, handled later.
     switch (hit.object.material.mat.*) {
-        .Lambert => color_at_px = try render_shader.render_lambert(
-            position,
-            normal,
-            object.material,
-            scene,
-        ),
         .AovAlpha => color_at_px = try render_shader.render_aov_alpha(
             object.material,
         ),
         .AovNormal => color_at_px = try render_shader.render_aov_normal(normal),
+        .Lambert => {},
     }
+
+    // getting initial color.
+    color_at_px = try render_shader.render_lambert(
+        position,
+        normal,
+        object.material,
+        scene,
+    );
+
+    const bounce_max: usize = 7;
+    if (bounce_number.* == bounce_max) return color_at_px;
+    bounce_number.* += 1;
+
+    // getting color from bounced rays.
+    var bounce_direction = normal.gen_random_hemisphere_normalized(rnd);
+    var bounce_color_at_px = try render_pixel(
+        scene,
+        hit.position.*,
+        bounce_direction,
+        hit,
+        rnd,
+        bounce_number,
+    );
+
+    const reflectance_factor: f32 = 0.7;
+    bounce_color_at_px = bounce_color_at_px.multiply(reflectance_factor);
+    color_at_px = color_at_px.sum_color(bounce_color_at_px);
+
     return color_at_px;
 }
 

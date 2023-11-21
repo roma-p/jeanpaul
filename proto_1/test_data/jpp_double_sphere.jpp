@@ -4,7 +4,7 @@
 scene
 {
 render_camera "camera_main"
-samples 4
+samples 2
 resolution ! V 2
 1024 768
 }
@@ -28,11 +28,11 @@ tmatrix ! M 4 4
 object.ImplicitSphere
 {
 name "sphere_red"
-material "lambert_grey"
+material "lambert_red"
 radius 10
 tmatrix ! M 4 4
 1 0 0 0
-0 1 0 0
+0 1 0 -2
 0 0 1 0
 0 0 0 1
 }
@@ -49,13 +49,25 @@ tmatrix ! M 4 4
 0 0 0 1
 }
 
+#object.ImplicitSphere
+#{
+#name "sphere_plane"
+#material "lambert_grey"
+#radius 10000
+#tmatrix ! M 4 4
+#1 0 0 7
+#0 1 0 -10006
+#0 0 1 0
+#0 0 0 1
+#}
+
 object.ImplicitPlane
 {
 name "ground"
-material "lambert_grey"
+material "lambert_blue"
 tmatrix ! M 4 4
 1 0 0 0
-0 1 0 -6
+0 1 0 -7
 0 0 1 0
 0 0 0 1
 }
@@ -70,7 +82,7 @@ tmatrix ! M 4 4
 0 0 0 1
 color ! V 3
 1 1 0.5
-intensity 2
+intensity 1.3
 exposition 8
 decay_rate "Quadratic"
 }
@@ -85,8 +97,8 @@ tmatrix ! M 4 4
 0 0 0 -9
 color ! V 3
 1 0.5 1
-intensity 0.5
-exposition 0
+intensity 0.75
+exposition 1
 decay_rate "NoDecay"
 }
 
@@ -97,7 +109,7 @@ material.Lambert
 name "lambert_red"
 kd_intensity 0.7
 kd_color ! V 3
-1 0 0
+0.8 0.5 0.5
 }
 
 material.Lambert
@@ -105,13 +117,13 @@ material.Lambert
 name "lambert_blue"
 kd_intensity 0.7
 kd_color ! V 3
-0 0 1
+0.5 0.5 0.8
 }
 
 material.Lambert
 {
 name "lambert_grey"
-kd_intensity 1
+kd_intensity 0.7
 kd_color ! V 3
 0.7 0.7 0.7
 }

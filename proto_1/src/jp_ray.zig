@@ -140,8 +140,6 @@ fn check_ray_hit(
     obj: *jp_object.JpObject,
     t: *f32,
 ) bool {
-    const _shift_origin_position = origin_position;
-
     switch (obj.get_category()) {
         .Camera => return false,
         .Mesh => unreachable, // not implemented but shall be...
@@ -155,7 +153,7 @@ fn check_ray_hit(
         .ImplicitSphere => {
             does_intersect = try check_ray_hit_implicit_sphere(
                 ray_direction,
-                _shift_origin_position,
+                origin_position,
                 obj.tmatrix.get_position(),
                 obj.shape.ImplicitSphere.radius,
                 t,
@@ -176,7 +174,7 @@ fn check_ray_hit(
         .LightOmni => {
             does_intersect = try check_ray_hit_light_omni(
                 ray_direction,
-                _shift_origin_position,
+                origin_position,
                 obj.tmatrix.get_position(),
                 t,
             );
@@ -252,7 +250,7 @@ pub fn check_ray_hit_implicit_plane(
     // t * ray_direction * plane_normal  =  - (ray_origin - plane_position) * plane_normal
     // t = ((plane_position - ray_origin) * plane_normal) / (ray_direction * plane_normal)
 
-    // no solution if ray_direction dot plane_normal == 0 (if theree are colinear, no intersection)
+    // no solution if ray_direction dot plane_normal == 0 (if there are colinear, no intersection)
     // we only consider t > 0.
 
     const denominator = ray_direction.product_dot(&plane_normal);
@@ -266,7 +264,9 @@ pub fn check_ray_hit_implicit_plane(
     const t: f32 = numerator / denominator;
 
     if (t <= types.JP_EPSILON) return false;
+
     intersect_ray_multiplier.* = t;
+
     return true;
 }
 
