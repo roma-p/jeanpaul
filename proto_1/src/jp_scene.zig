@@ -17,6 +17,7 @@ pub const JpScene = struct {
     materials: std.ArrayList(*jp_material.JpMaterial),
     resolution: types.Vec2u16 = types.Vec2u16{ .x = 640, .y = 480 },
     samples: i16 = 3,
+    bounces: i16 = 3,
     render_camera: *jp_object.JpObject,
 
     const Self = @This();

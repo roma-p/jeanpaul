@@ -502,19 +502,21 @@ pub const JppParser = struct {
                 render_camera_defined = true;
                 try property.check_is_string();
                 self.render_camera_name = property.value.String;
-            }
-            if (std.mem.eql(u8, property.name, "resolution")) {
+            } else if (std.mem.eql(u8, property.name, "resolution")) {
                 resolution_found = true;
                 try property.check_is_vector(2);
                 scene.resolution = types.Vec2u16{
                     .x = @intFromFloat(property.value.Vector.vector[0]),
                     .y = @intFromFloat(property.value.Vector.vector[1]),
                 };
-            }
-            if (std.mem.eql(u8, property.name, "samples")) {
+            } else if (std.mem.eql(u8, property.name, "samples")) {
                 try property.check_is_number();
                 const samples: i16 = @intFromFloat(property.value.Number);
                 scene.samples = samples;
+            } else if (std.mem.eql(u8, property.name, "bounces")) {
+                try property.check_is_number();
+                const bounces: i16 = @intFromFloat(property.value.Number);
+                scene.bounces = bounces;
             }
         }
         if (!render_camera_defined) {
@@ -659,16 +661,18 @@ pub const JppParser = struct {
                 material.mat.Lambert.kd_color.r = property.value.Vector.vector[0];
                 material.mat.Lambert.kd_color.g = property.value.Vector.vector[1];
                 material.mat.Lambert.kd_color.b = property.value.Vector.vector[2];
-            }
-            if (std.mem.eql(u8, property.name, "kd_intensity")) {
+            } else if (std.mem.eql(u8, property.name, "kd_intensity")) {
                 property.processed = true;
                 try property.check_is_number();
                 material.mat.Lambert.kd_intensity = property.value.Number;
-            }
-            if (std.mem.eql(u8, property.name, "kd_ambiant")) {
+            } else if (std.mem.eql(u8, property.name, "kd_ambiant")) {
                 property.processed = true;
                 try property.check_is_number();
                 material.mat.Lambert.kd_ambiant = property.value.Number;
+            } else if (std.mem.eql(u8, property.name, "diff_reflection")) {
+                property.processed = true;
+                try property.check_is_number();
+                material.mat.Lambert.diff_reflection = property.value.Number;
             }
         }
     }

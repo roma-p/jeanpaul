@@ -71,6 +71,7 @@ pub fn render(
                 );
 
                 var bounce_number: usize = 0;
+                var diff_reflection: f32 = 1;
                 var color_at_px = try render_pixel(
                     scene,
                     camera.tmatrix.get_position(),
@@ -78,6 +79,7 @@ pub fn render(
                     _hit,
                     &rnd,
                     &bounce_number,
+                    &diff_reflection,
                 );
 
                 color_at_px = color_at_px.multiply(inverted_sample_number);
@@ -94,6 +96,7 @@ pub fn render_pixel(
     hit: *jp_ray.JpRayHit,
     rnd: *std.rand.DefaultPrng,
     bounce_number: *usize,
+    diff_reflection: *f32,
 ) !jp_color.JpColor {
     var color_at_px: jp_color.JpColor = jp_color.JP_COLOR_BlACK;
 
@@ -128,12 +131,22 @@ pub fn render_pixel(
         scene,
     );
 
-    const bounce_max: usize = 7;
-    if (bounce_number.* == bounce_max) return color_at_px;
+    color_at_px = color_at_px.multiply(diff_reflection.*);
+
+    if (bounce_number.* == scene.bounces) return color_at_px;
     bounce_number.* += 1;
 
     // getting color from bounced rays.
     var bounce_direction = normal.gen_random_hemisphere_normalized(rnd);
+
+    var reflectance_factor: f32 = 1;
+    switch (hit.object.*.material.mat.*) {
+        .Lambert => reflectance_factor = hit.object.*.material.mat.Lambert.diff_reflection,
+        else => {},
+    }
+
+    diff_reflection.* = diff_reflection.* * reflectance_factor;
+
     var bounce_color_at_px = try render_pixel(
         scene,
         hit.position.*,
@@ -141,9 +154,9 @@ pub fn render_pixel(
         hit,
         rnd,
         bounce_number,
+        diff_reflection,
     );
 
-    const reflectance_factor: f32 = 0.7;
     bounce_color_at_px = bounce_color_at_px.multiply(reflectance_factor);
     color_at_px = color_at_px.sum_color(bounce_color_at_px);
 

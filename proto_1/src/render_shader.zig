@@ -32,7 +32,6 @@ pub fn render_lambert(
             scene,
         );
         if (!is_reachable) continue;
-        // _ = is_reachable;
 
         // computing diffuse pass.
 
