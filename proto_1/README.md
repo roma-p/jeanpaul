@@ -4,7 +4,7 @@
 This first prototype is a CPU only, monothreaded simple ray tracer.
 It is mostly based on this [article](https://matklad.github.io/2022/12/31/raytracer-construction-kit.html) by Alex Kladov.
 
-![render](historic/proto_1_r7.png)
+![render](../historic/proto_1_r7.png)
 
 To build it: 
 
