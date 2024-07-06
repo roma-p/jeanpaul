@@ -1,7 +1,7 @@
 const std = @import("std");
 const gpa = std.heap.page_allocator;
 
-const maths = @import("maths.zig");
+const maths_mat = @import("maths_mat.zig");
 const jp_color = @import("jp_color.zig");
 
 const JpColor = jp_color.JpColor;
@@ -14,24 +14,24 @@ pub const ControllerImg = @This();
 width: u16 = undefined,
 height: u16 = undefined,
 
-al_image_layer: std.ArrayList(*maths.Matrix(JpColor)),
-al_layer_name: std.ArrayList([]const u8),
+array_image_layer: std.ArrayList(*maths_mat.Matrix(JpColor)),
+array_layer_name: std.ArrayList([]const u8),
 
 pub fn init(width: u16, height: u16) ControllerImg {
     const ret = ControllerImg{
         .width = width,
         .height = height,
-        .al_image_layer = std.ArrayList(*maths.Matrix(JpColor)).init(gpa),
-        .al_layer_name = std.ArrayList([]const u8).init(gpa),
+        .array_image_layer = std.ArrayList(*maths_mat.Matrix(JpColor)).init(gpa),
+        .array_layer_name = std.ArrayList([]const u8).init(gpa),
     };
     return ret;
 }
 
 pub fn deinit(self: *ControllerImg) void {
-    for (self.al_image_layer.items) |matrix| {
+    for (self.array_image_layer.items) |matrix| {
         matrix.deinit(&gpa);
     }
-    self.al_layer_name.deinit();
+    self.array_layer_name.deinit();
     self.* = undefined;
 }
 
@@ -40,16 +40,16 @@ pub fn register_image_layer(
     layer_name: []const u8,
 ) !usize {
     // TODO: check if name free...
-    const ret = self.al_image_layer.items.len;
-    const m = try gpa.create(maths.Matrix(JpColor));
-    m.* = maths.Matrix(JpColor).init(
+    const ret = self.array_image_layer.items.len;
+    const m = try gpa.create(maths_mat.Matrix(JpColor));
+    m.* = maths_mat.Matrix(JpColor).init(
         self.width,
         self.height,
         JP_COLOR_BlACK,
         &gpa,
     );
-    try self.al_image_layer.append(m);
-    try self.al_layer_name.append(layer_name);
+    try self.array_image_layer.append(m);
+    try self.array_layer_name.append(layer_name);
     return ret;
 }
 
@@ -58,7 +58,7 @@ pub fn write_ppm(
     out_dir: []const u8,
     file_name: []const u8,
 ) !void {
-    const layer_number = self.al_image_layer.items.len;
+    const layer_number = self.array_image_layer.items.len;
     var thread_array = std.ArrayList(std.Thread).init(gpa);
 
     var i: usize = 0;
@@ -94,7 +94,7 @@ fn _write_ppm_single_layer(
     const file_path = try std.fmt.allocPrint(
         gpa,
         "{s}/{s}_{s}.ppm",
-        .{ out_dir, file_name, self.al_layer_name.items[layer_id] },
+        .{ out_dir, file_name, self.array_layer_name.items[layer_id] },
     );
     defer gpa.free(file_path);
 
@@ -115,7 +115,7 @@ fn _write_ppm_single_layer(
     while (_y > 0) : (_y -= 1) {
         _x = 0;
         while (_x < self.width) : (_x += 1) {
-            const px = self.al_image_layer.items[layer_id].*.data[_x][_y - 1];
+            const px = self.array_image_layer.items[layer_id].*.data[_x][_y - 1];
             const buffer_line_content = try std.fmt.bufPrint(
                 &buffer_line,
                 "\n{} {} {}",
@@ -135,10 +135,9 @@ test "controller_img" {
     var controller_img = ControllerImg.init(1920, 1080);
     _ = try controller_img.register_image_layer("layer_1");
     _ = try controller_img.register_image_layer("layer_2");
-    controller_img.al_image_layer.items[0].*.data[0][0].r = 1;
-    controller_img.al_image_layer.items[0].*.data[0][0].g = 1;
-    controller_img.al_image_layer.items[0].*.data[0][0].b = 1;
+    controller_img.array_image_layer.items[0].*.data[0][0].r = 1;
+    controller_img.array_image_layer.items[0].*.data[0][0].g = 1;
+    controller_img.array_image_layer.items[0].*.data[0][0].b = 1;
     try controller_img.write_ppm("tests", "test");
-    std.debug.print("\n{d}", .{controller_img.al_image_layer.items[0].*.data[0][0].r});
     controller_img.deinit();
 }
