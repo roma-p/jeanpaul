@@ -94,6 +94,10 @@ const RenderingSharedData = struct {
 const RenderInfo = struct {
     pixsel_size: f32,
     tile_number: u16,
+    tile_size: u16,
+    image_width: u16,
+    image_height: u16,
+    samples: u16,
     tile_x_number: u16,
     tile_y_number: u16,
     focal_plane_center: maths_vec.Vec3f32,
@@ -140,11 +144,14 @@ fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !Render
 
     return RenderInfo{
         .pixsel_size = pixel_size,
-        .tile_number = tile_x_y.x * tile_x_y.y, // TO DELETE ?
+        .tile_number = tile_x_y.x * tile_x_y.y,
+        .tile_size = render_settings.tile_size,
+        .image_width = image_width,
+        .image_height = image_height,
+        .samples = render_settings.samples,
         .tile_x_number = tile_x_y.x,
         .tile_y_number = tile_x_y.y,
         .focal_plane_center = cam_focal_plane_center,
-        // sample number 2^
     };
 }
 
@@ -181,7 +188,7 @@ pub fn render(
     try self.controller_img.write_ppm(dir, img_name);
 }
 
-pub fn render_func_per_core(self: *Renderer, render_info: RenderInfo) void {
+fn render_func_per_core(self: *Renderer, render_info: RenderInfo) void {
     var is_a_tile_finished_render = false;
 
     while (true) {
@@ -192,11 +199,9 @@ pub fn render_func_per_core(self: *Renderer, render_info: RenderInfo) void {
             const tile_bounding_rectangle = get_tile_bouding_rectangle(
                 render_info.tile_x_number,
                 value,
-                // TODO: all below needs to be in render info.
-                self.controller_scene.render_settings.tile_size, // put this in renderinfo.
-                self.controller_scene.render_settings.width,
-                self.controller_scene.render_settings.height,
-                // render_info.tile_s,
+                render_info.tile_size,
+                render_info.image_width,
+                render_info.image_height,
             );
             var _x: u16 = tile_bounding_rectangle.x_min;
             var _y: u16 = undefined;
