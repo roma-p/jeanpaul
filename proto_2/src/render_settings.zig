@@ -11,9 +11,9 @@ pub fn create_with_default_value() RenderSettings {
     return .{
         .width = 1080,
         .height = 720,
-        .samples = 7,
+        .samples = 2,
         .bounces = 6,
-        .render_type = RenderType.SingleThread,
+        .render_type = RenderType.Tile,
         .tile_size = 64,
     };
 }

@@ -1,4 +1,4 @@
 
 test:
-	zig test src/tests.zig
+	zig test src/tests.zig -freference-trace
 
