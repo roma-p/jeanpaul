@@ -65,9 +65,9 @@ pub fn write_to_px_thread_safe(self: *ControllerImg, x: u16, y: u16, c: jp_color
     self.array_image_layer.items[0].*.data[x][y] = c;
 }
 
-pub fn write_to_px(self: *ControllerImg, x: u16, y: u16, c: jp_color.JpColor) void {
-    // tmp method, no layer...
-    self.array_image_layer.items[0].*.data[x][y] = c;
+pub fn write_to_px(self: *ControllerImg, x: u16, y: u16, layer_index: usize, c: jp_color.JpColor) void {
+    // TODO: check layer_index < len !!!!!
+    self.array_image_layer.items[layer_index].*.data[x][y] = c;
 }
 
 pub fn write_ppm(

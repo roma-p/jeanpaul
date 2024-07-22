@@ -62,6 +62,7 @@ pub fn render(
     const time_start = std.time.timestamp();
 
     self.render_info = try self.gen_render_info(camera_handle);
+
     switch (self.render_info.render_type) {
         render_settings.RenderType.Tile => try render_tile(
             self,
@@ -139,7 +140,7 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
             while (_x <= tile_bounding_rectangle.x_max) : (_x += 1) {
                 _y = tile_bounding_rectangle.y_min;
                 while (_y <= tile_bounding_rectangle.y_max) : (_y += 1) {
-                    self.render_single_px(_x, _y);
+                    self.render_single_px(_x, _y, &pixel_payload);
                 }
             }
             is_a_tile_finished_render = true;
@@ -149,22 +150,31 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
     }
 }
 
-fn render_single_px(self: *Renderer, x: u16, y: u16) void {
-    // fn render_single_px(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) void {
-    const sample_nbr = std.math.pow(u16, 2, self.render_info.samples);
-    const sample_nbr_as_f32: f32 = @floatFromInt(sample_nbr);
-    const invert_sample_nbr: f32 = 1 / sample_nbr_as_f32;
+fn render_single_px(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) void {
+    pixel_payload.reset();
+    // TODO: single sample shall not care, about sampling id. So Each Thread shall make two payloads.
+    // SOOOOOO, a pool?
     var sample_i: usize = 0;
-    var color_at_px = jp_color.JP_COLOR_BlACK;
-    while (sample_i < sample_nbr) : (sample_i += 1) {
-        const tmp_color_at_px = jp_color.JP_COLOR_RED.multiply(invert_sample_nbr);
-        color_at_px = color_at_px.sum_color(tmp_color_at_px);
+    while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
+        self.render_single_px_single_sample(x, y, pixel_payload);
     }
-    self.controller_img.write_to_px(x, y, color_at_px);
+    var it = pixel_payload.aov_to_color.iterator();
+    while (it.next()) |item| {
+        const layer_index = self.aov_to_image_layer.get(item.key_ptr.*) orelse unreachable;
+        self.controller_img.write_to_px(x, y, layer_index, item.value_ptr.*);
+    }
 }
 
-// fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload, ) void {
-// }
+fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) void {
+    _ = x;
+    _ = y;
+    const beauty_value = jp_color.JP_COLOR_RED.multiply(self.render_info.samples_invert);
+    const normal_value = jp_color.JP_COLOR_BLUE.multiply(self.render_info.samples_invert);
+    const beauty_aov = pixel_payload.*.aov_to_color.getPtr(ControllerAov.AovStandard.Beauty);
+    const normal_aov = pixel_payload.*.aov_to_color.getPtr(ControllerAov.AovStandard.Normal);
+    beauty_aov.?.add_color(beauty_value);
+    normal_aov.?.add_color(normal_value);
+}
 
 fn calculate_tile_number(
     width: u16,
@@ -223,6 +233,9 @@ const RenderInfo = struct {
     focal_plane_center: maths_vec.Vec3f32,
     data_per_render_type: DataPerRenderType,
 
+    samples_nbr: u16,
+    samples_invert: f32,
+
     const DataPerRenderType = union(render_settings.RenderType) {
         SingleThread: struct {},
         Scanline: struct {},
@@ -273,12 +286,18 @@ fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !Render
         image_width,
     );
 
+    const sample_nbr = std.math.pow(u16, 2, scene_render_settings.samples);
+    const sample_nbr_as_f32: f32 = @floatFromInt(sample_nbr);
+    const invert_sample_nbr: f32 = 1 / sample_nbr_as_f32;
+
     return RenderInfo{
         .pixel_size = pixel_size,
         .image_width = image_width,
         .image_height = image_height,
         .render_type = scene_render_settings.render_type,
         .samples = scene_render_settings.samples,
+        .samples_nbr = sample_nbr,
+        .samples_invert = invert_sample_nbr,
         .bounces = scene_render_settings.bounces,
         .focal_plane_center = cam_focal_plane_center,
         .data_per_render_type = switch (scene_render_settings.render_type) {
@@ -533,7 +552,3 @@ test "i_prepare_render" {
 
     try renderer.render(cam_1_handle, "tests", "test_render_image");
 }
-
-// TODO: render: generate a "payload request" object (with all asked aovs, bounces and sutch.
-// TODO: for each trhead allocate on the heap. Index is given by the payload request.
-// Then a system is able to reconstruct the final avos from the recevied payload.

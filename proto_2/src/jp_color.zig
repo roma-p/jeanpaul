@@ -8,17 +8,23 @@ pub const JpColor = struct {
 
     pub fn multiply(self: *const JpColor, x: f32) JpColor {
         return JpColor{
-            .r = x * self.r,
-            .g = x * self.g,
-            .b = x * self.b,
+            .r = _clamp(x * self.r),
+            .g = _clamp(x * self.g),
+            .b = _clamp(x * self.b),
         };
+    }
+
+    pub fn add_color(self: *JpColor, color: JpColor) void {
+        self.r = _clamp(self.r + color.r);
+        self.g = _clamp(self.g + color.g);
+        self.b = _clamp(self.b + color.b);
     }
 
     pub fn sum_color(self: *const JpColor, color: JpColor) JpColor {
         return JpColor{
-            .r = self.r + color.r,
-            .g = self.g + color.g,
-            .b = self.b + color.b,
+            .r = _clamp(self.r + color.r),
+            .g = _clamp(self.g + color.g),
+            .b = _clamp(self.b + color.b),
         };
     }
 
@@ -27,10 +33,14 @@ pub const JpColor = struct {
         color: *const JpColor,
     ) JpColor {
         return JpColor{
-            .r = self.r * color.r,
-            .g = self.g * color.g,
-            .b = self.b * color.b,
+            .r = _clamp(self.r * color.r),
+            .g = _clamp(self.g * color.g),
+            .b = _clamp(self.b * color.b),
         };
+    }
+
+    pub fn _clamp(value: f32) f32 {
+        return @max(@min(value, 1), 0);
     }
 };
 
