@@ -30,7 +30,6 @@ render_shared_data: RenderingSharedData,
 render_info: RenderInfo,
 aov_to_image_layer: std.AutoHashMap(ControllerAov.AovStandard, usize),
 
-// add render info in struct !!
 pub fn init(controller_scene: *ControllereScene) Renderer {
     return .{
         .controller_scene = controller_scene,
@@ -119,7 +118,10 @@ pub fn render_tile(
 fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !void {
     var is_a_tile_finished_render = false;
 
-    var pixel_payload = try PixelPayload.init(&self.controller_scene.controller_aov);
+    var pixel_payload = try PixelPayload.init(
+        &self.controller_scene.controller_aov,
+        self.render_info.samples_invert,
+    );
     defer pixel_payload.deinit();
 
     while (true) {
@@ -152,8 +154,6 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
 
 fn render_single_px(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) void {
     pixel_payload.reset();
-    // TODO: single sample shall not care, about sampling id. So Each Thread shall make two payloads.
-    // SOOOOOO, a pool?
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
         self.render_single_px_single_sample(x, y, pixel_payload);
@@ -168,12 +168,10 @@ fn render_single_px(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayloa
 fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) void {
     _ = x;
     _ = y;
-    const beauty_value = jp_color.JP_COLOR_RED.multiply(self.render_info.samples_invert);
-    const normal_value = jp_color.JP_COLOR_BLUE.multiply(self.render_info.samples_invert);
-    const beauty_aov = pixel_payload.*.aov_to_color.getPtr(ControllerAov.AovStandard.Beauty);
-    const normal_aov = pixel_payload.*.aov_to_color.getPtr(ControllerAov.AovStandard.Normal);
-    beauty_aov.?.add_color(beauty_value);
-    normal_aov.?.add_color(normal_value);
+    _ = self;
+
+    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Beauty, jp_color.JP_COLOR_RED);
+    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Normal, jp_color.JP_COLOR_GREY);
 }
 
 fn calculate_tile_number(
@@ -413,12 +411,14 @@ const RenderingSharedData = struct {
 
 const PixelPayload = struct {
     aov_to_color: std.AutoHashMap(ControllerAov.AovStandard, jp_color.JpColor),
+    sample_nbr_invert: f32,
 
     const Self = @This();
 
-    pub fn init(controller_aov: *ControllerAov) !Self {
+    pub fn init(controller_aov: *ControllerAov, sample_nbr_invert: f32) !Self {
         var ret = .{
             .aov_to_color = std.AutoHashMap(ControllerAov.AovStandard, jp_color.JpColor).init(gpa),
+            .sample_nbr_invert = sample_nbr_invert,
         };
         for (controller_aov.array_aov_standard.items) |aov| {
             try ret.aov_to_color.put(aov, jp_color.JP_COLOR_BlACK);
@@ -435,6 +435,16 @@ const PixelPayload = struct {
         while (it.next()) |item| {
             item.value_ptr.* = jp_color.JP_COLOR_BlACK;
         }
+    }
+
+    pub fn add_sample_to_aov(
+        self: *Self,
+        aov_standard: ControllerAov.AovStandard,
+        value: jp_color.JpColor,
+    ) void {
+        const aov_ptr = self.aov_to_color.getPtr(aov_standard); // TODO: check for key existence....
+        const sampled_value = value.multiply(self.sample_nbr_invert);
+        aov_ptr.?.* = aov_ptr.?.sum_color(sampled_value);
     }
 };
 
