@@ -117,6 +117,7 @@ pub fn render_tile(
 
 fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !void {
     var is_a_tile_finished_render = false;
+    var pxl_rendered_nbr: u16 = 0;
 
     var pixel_payload = try PixelPayload.init(
         &self.controller_scene.controller_aov,
@@ -127,6 +128,7 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
     while (true) {
         const tile_to_render_idx = self.render_shared_data.get_next_tile_to_render(
             is_a_tile_finished_render,
+            pxl_rendered_nbr,
         );
         if (tile_to_render_idx) |value| {
             const tile_bounding_rectangle = get_tile_bouding_rectangle(
@@ -136,6 +138,8 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
                 render_info.image_width,
                 render_info.image_height,
             );
+            pxl_rendered_nbr = get_tile_pixel_number(tile_bounding_rectangle);
+
             var _x: u16 = tile_bounding_rectangle.x_min;
             var _y: u16 = undefined;
 
@@ -205,6 +209,13 @@ fn get_tile_bouding_rectangle(
         .y_min = y_index * tile_size,
         .y_max = @min(y_index * tile_size + tile_size - 1, image_height - 1),
     };
+    return ret;
+}
+
+fn get_tile_pixel_number(bouding_rectangle: maths_mat.BoudingRectangleu16) u16 {
+    const x_number = bouding_rectangle.x_max - bouding_rectangle.x_min;
+    const y_number = bouding_rectangle.y_max - bouding_rectangle.y_min;
+    const ret = @mulWithOverflow(x_number, y_number).@"0";
     return ret;
 }
 
@@ -316,10 +327,13 @@ fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !Render
 const RenderingSharedData = struct {
     mutex: Mutex,
 
-    pixel_done_nb: u16,
-    pixel_total_nb: u16,
+    pixel_done_nb: u32,
+    pixel_total_nb: u32,
     last_percent_display: u16,
+    last_percent_display_time: i64,
     data_per_render_type: DataPerRenderType,
+
+    const DELAY_BETWEEN_PERCENT_DISPLAY_S = 2;
 
     const DataPerRenderType = union(render_settings.RenderType) {
         SingleThread: struct {},
@@ -328,22 +342,23 @@ const RenderingSharedData = struct {
             next_tile_to_render: ?u16,
             tile_already_rendered: u16,
             tile_number: u16,
-            tile_px_nb: u16,
         },
     };
 
     const Self = @This();
 
     pub fn init(render_info: RenderInfo) Self {
-        const px_number_ret = @mulWithOverflow(render_info.image_height, render_info.image_width);
-        if (px_number_ret.@"1" == 0) {
-            unreachable;
-        }
+        const px_number_ret = @mulWithOverflow(
+            @as(u32, render_info.image_height),
+            @as(u32, render_info.image_width),
+        );
+        if (px_number_ret.@"1" == 1) unreachable;
 
         return .{
             .mutex = Mutex{},
             .pixel_done_nb = 0,
             .last_percent_display = 0,
+            .last_percent_display_time = 0,
             .pixel_total_nb = px_number_ret.@"0",
             .data_per_render_type = switch (render_info.data_per_render_type) {
                 render_settings.RenderType.Tile => RenderingSharedData.DataPerRenderType{
@@ -351,10 +366,6 @@ const RenderingSharedData = struct {
                         .next_tile_to_render = 0,
                         .tile_already_rendered = 0,
                         .tile_number = render_info.data_per_render_type.Tile.tile_number,
-                        .tile_px_nb = @mulWithOverflow(
-                            render_info.data_per_render_type.Tile.tile_size,
-                            render_info.data_per_render_type.Tile.tile_size,
-                        ).@"0",
                     },
                 },
                 render_settings.RenderType.Scanline => unreachable,
@@ -363,30 +374,38 @@ const RenderingSharedData = struct {
         };
     }
 
-    pub fn add_rendered_pixel_number(self: *Self, pixel_rendered_number: u16) void {
+    pub fn add_rendered_pixel_number(self: *Self, pixel_rendered_number: u32) void {
         const px_number_ret = @addWithOverflow(self.pixel_done_nb, pixel_rendered_number);
         self.pixel_done_nb = px_number_ret.@"0";
     }
 
     pub fn update_progress(self: *Self) void {
-        const pixel_done_nb: f32 = @floatFromInt(self.pixel_done_nb);
-        const pixel_total_nb: f32 = @floatFromInt(self.pixel_total_nb);
-        const current_percent_done_f32: f32 = @round((pixel_done_nb / pixel_total_nb) * 10) * 10;
-        const current_percent_done: u16 = @intFromFloat(current_percent_done_f32);
+        const pixel_done_nb: f64 = @floatFromInt(self.pixel_done_nb);
+        const pixel_total_nb: f64 = @floatFromInt(self.pixel_total_nb);
+        const current_percent_done_f64: f64 = @round((pixel_done_nb / pixel_total_nb) * 10) * 10;
+        const current_percent_done: u16 = @intFromFloat(current_percent_done_f64);
         if (current_percent_done <= self.last_percent_display) return;
-        self.last_percent_display = current_percent_done;
-        log_progress(current_percent_done);
+
+        const now = std.time.timestamp();
+        const before = self.last_percent_display_time;
+        if (before == 0 or (now - before) > DELAY_BETWEEN_PERCENT_DISPLAY_S or current_percent_done_f64 == 100) {
+            self.last_percent_display = current_percent_done;
+            self.last_percent_display_time = now;
+            log_progress(current_percent_done);
+        }
     }
 
-    pub fn get_next_tile_to_render(self: *Self, is_a_tile_finished_rendering: bool) ?u16 {
+    pub fn get_next_tile_to_render(
+        self: *Self,
+        is_a_tile_finished_rendering: bool,
+        pxl_rendered_nbr: u16,
+    ) ?u16 {
         self.mutex.lock();
         defer self.mutex.unlock();
 
         const render_tile_data = switch (self.data_per_render_type) {
             render_settings.RenderType.Tile => &self.data_per_render_type.Tile,
             else => unreachable,
-            // render_settings.RenderType.Scanline => unreachable,
-            // render_settings.RenderType.SingleThread => unreachable,
         };
 
         var ret = render_tile_data.*.next_tile_to_render;
@@ -401,8 +420,7 @@ const RenderingSharedData = struct {
 
         if (is_a_tile_finished_rendering) {
             render_tile_data.*.tile_already_rendered += 1;
-            // FIXME: wrong, all tiles does not have the same size... this is to correct.
-            self.add_rendered_pixel_number(self.data_per_render_type.Tile.tile_px_nb);
+            self.add_rendered_pixel_number(pxl_rendered_nbr);
             self.update_progress();
         }
         return ret;
@@ -495,9 +513,12 @@ fn log_progress(progress_percent: u16) void {
 // }
 
 fn format_time(time_epoch: i64) struct { hour: u8, min: u8, sec: u8 } {
-    const min_total = @divFloor(time_epoch, 60);
-    const sec = @rem(min_total, 60);
-    const hour = @divFloor(min_total, 60);
+    if (time_epoch < 0) unreachable;
+    const time_epoch_pos: u32 = @intCast(time_epoch);
+
+    const min_total = time_epoch_pos / std.time.s_per_min;
+    const sec = @rem(time_epoch_pos, 60);
+    const hour = min_total / 60;
     const min = @rem(min_total, 60);
 
     const sec_u8: u8 = @intCast(sec);
@@ -550,6 +571,7 @@ test "i_prepare_render" {
     controller_scene.render_settings.width = 1920;
     controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
+    controller_scene.render_settings.samples = 6;
 
     try controller_scene.controller_aov.add_aov_standard(ControllerAov.AovStandard.Beauty);
     try controller_scene.controller_aov.add_aov_standard(ControllerAov.AovStandard.Alpha);
