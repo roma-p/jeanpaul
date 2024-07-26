@@ -5,7 +5,7 @@ const gpa = std.heap.page_allocator;
 const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
 
-const handles = @import("handle.zig");
+const data_handles = @import("data_handle.zig");
 
 pub const ControllerObject = @This();
 
@@ -34,8 +34,8 @@ pub fn deinit(self: *ControllerObject) void {
 
 pub const Camera = struct {
     tag: Tag,
-    handle_name: handles.HandleObjectName,
-    handle_tmatrix: handles.HandleTMatrix,
+    handle_name: data_handles.HandleObjectName,
+    handle_tmatrix: data_handles.HandleTMatrix,
     focal_length: f32 = 10,
     field_of_view: f32 = 60,
 
@@ -47,9 +47,9 @@ pub const Camera = struct {
 pub const Shape = struct {
     tag: Tag,
     data: Data,
-    handle_name: handles.HandleObjectName,
+    handle_name: data_handles.HandleObjectName,
     handle_material: usize, // TODO
-    handle_tmatrix: handles.HandleTMatrix,
+    handle_tmatrix: data_handles.HandleTMatrix,
 
     const IMPLICIT_PLANE_DIRECTION = maths_vec.Vec3f32.create_y();
 
@@ -71,10 +71,10 @@ pub const Shape = struct {
 pub fn add_camera(
     self: *ControllerObject,
     name: []const u8,
-) !handles.HandleCamera {
-    const handle_name: handles.HandleObjectName = try self._add_name(name);
-    const handle_tmatrix: handles.HandleTMatrix = try self._add_tmatrix();
-    const handle_camera = handles.HandleCamera{
+) !data_handles.HandleCamera {
+    const handle_name: data_handles.HandleObjectName = try self._add_name(name);
+    const handle_tmatrix: data_handles.HandleTMatrix = try self._add_tmatrix();
+    const handle_camera = data_handles.HandleCamera{
         .idx = self.array_camera.items.len,
     };
 
@@ -90,10 +90,10 @@ pub fn add_shape(
     self: *ControllerObject,
     name: []const u8,
     tag: Shape.Tag,
-) !handles.HandleShape {
-    const handle_name: handles.HandleObjectName = try self._add_name(name);
-    const handle_tmatrix: handles.HandleTMatrix = try self._add_tmatrix();
-    const handle_shape = handles.HandleShape{ .idx = self.array_shape.items.len };
+) !data_handles.HandleShape {
+    const handle_name: data_handles.HandleObjectName = try self._add_name(name);
+    const handle_tmatrix: data_handles.HandleTMatrix = try self._add_tmatrix();
+    const handle_shape = data_handles.HandleShape{ .idx = self.array_shape.items.len };
 
     try self.array_shape.append(Shape{
         .handle_name = handle_name,
@@ -108,7 +108,7 @@ pub fn add_shape(
     return handle_shape;
 }
 
-pub fn get_camera_pointer(self: *const ControllerObject, handle: handles.HandleCamera) SceneError!*const Camera {
+pub fn get_camera_pointer(self: *const ControllerObject, handle: data_handles.HandleCamera) SceneError!*const Camera {
     if (handle.idx > self.array_camera.items.len) {
         return SceneError.InvalidHandle;
     }
@@ -116,7 +116,7 @@ pub fn get_camera_pointer(self: *const ControllerObject, handle: handles.HandleC
     return &val;
 }
 
-pub fn get_shape_pointer(self: *const ControllerObject, handle: handles.HandleShape) SceneError!*const Shape {
+pub fn get_shape_pointer(self: *const ControllerObject, handle: data_handles.HandleShape) SceneError!*const Shape {
     if (handle.idx > self.array_shape.items.len) {
         return SceneError.InvalidHandle;
     }
@@ -124,7 +124,7 @@ pub fn get_shape_pointer(self: *const ControllerObject, handle: handles.HandleSh
     return &val;
 }
 
-pub fn get_object_name_pointer(self: *const ControllerObject, handle: handles.HandleObjectName) SceneError!*const []u8 {
+pub fn get_object_name_pointer(self: *const ControllerObject, handle: data_handles.HandleObjectName) SceneError!*const []u8 {
     if (handle.idx > self.array_name.items.len) {
         return SceneError.InvalidHandle;
     }
@@ -132,7 +132,7 @@ pub fn get_object_name_pointer(self: *const ControllerObject, handle: handles.Ha
     return &val;
 }
 
-pub fn get_tmatrix_pointer(self: *const ControllerObject, handle: handles.HandleTMatrix) SceneError!*const maths_tmat.TMatrix {
+pub fn get_tmatrix_pointer(self: *const ControllerObject, handle: data_handles.HandleTMatrix) SceneError!*const maths_tmat.TMatrix {
     if (handle.idx > self.array_tmatrix.items.len) {
         return SceneError.InvalidHandle;
     }
@@ -140,7 +140,7 @@ pub fn get_tmatrix_pointer(self: *const ControllerObject, handle: handles.Handle
     return &val;
 }
 
-fn _add_name(self: *ControllerObject, name: []const u8) !handles.HandleObjectName {
+fn _add_name(self: *ControllerObject, name: []const u8) !data_handles.HandleObjectName {
     for (self.array_name.items) |existing_name| {
         if (existing_name) |value| {
             if (std.mem.eql(u8, value, name)) {
@@ -150,13 +150,13 @@ fn _add_name(self: *ControllerObject, name: []const u8) !handles.HandleObjectNam
     }
     const idx: usize = self.array_name.items.len;
     try self.array_name.append(name);
-    return handles.HandleObjectName{ .idx = idx };
+    return data_handles.HandleObjectName{ .idx = idx };
 }
 
-fn _add_tmatrix(self: *ControllerObject) !handles.HandleTMatrix {
+fn _add_tmatrix(self: *ControllerObject) !data_handles.HandleTMatrix {
     const idx: usize = self.array_tmatrix.items.len;
     try self.array_tmatrix.append(maths_tmat.TMatrix{});
-    return handles.HandleTMatrix{ .idx = idx };
+    return data_handles.HandleTMatrix{ .idx = idx };
 }
 
 test "co_init_deinit" {
@@ -167,11 +167,11 @@ test "co_init_deinit" {
 test "co_add_camera" {
     // first valid camera.
     var controller = ControllerObject.init();
-    const cam_1_handle: handles.HandleCamera = try controller.add_camera("camera1");
+    const cam_1_handle: data_handles.HandleCamera = try controller.add_camera("camera1");
     try std.testing.expectEqual(0, cam_1_handle.idx);
 
     // second valid camera.
-    const cam_2_handle: handles.HandleCamera = try controller.add_camera("camera2");
+    const cam_2_handle: data_handles.HandleCamera = try controller.add_camera("camera2");
     try std.testing.expectEqual(1, cam_2_handle.idx);
     const cam_2_name_handle = controller.array_camera.items[cam_2_handle.idx].?.handle_name;
     try std.testing.expectEqual("camera2", controller.array_name.items[cam_2_name_handle.idx]);
@@ -180,7 +180,7 @@ test "co_add_camera" {
     try std.testing.expectError(SceneError.NameAlreadyTaken, controller.add_camera("camera2"));
 
     // get camera
-    const handle_cam = handles.HandleCamera{ .idx = 1 };
+    const handle_cam = data_handles.HandleCamera{ .idx = 1 };
     const cam_pointer = try controller.get_camera_pointer(handle_cam);
     try std.testing.expectEqual(10, cam_pointer.*.focal_length);
 
@@ -189,7 +189,7 @@ test "co_add_camera" {
 
 test "co_add_sphere" {
     var controller = ControllerObject.init();
-    const sphere_1_handle: handles.HandleShape = try controller.add_shape(
+    const sphere_1_handle: data_handles.HandleShape = try controller.add_shape(
         "sphere1",
         Shape.Tag.ImplicitSphere,
     );
@@ -203,7 +203,7 @@ test "co_add_sphere" {
 
 test "co_add_plane" {
     var controller = ControllerObject.init();
-    const plane_1_handle: handles.HandleShape = try controller.add_shape(
+    const plane_1_handle: data_handles.HandleShape = try controller.add_shape(
         "plane",
         Shape.Tag.ImplicitPlane,
     );

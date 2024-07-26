@@ -5,10 +5,16 @@ const Thread = std.Thread;
 const Mutex = Thread.Mutex;
 const SpawnConfig = Thread.SpawnConfig;
 
-const zig_utils = @import("zig_utils.zig");
-const handles = @import("handle.zig");
 const constants = @import("constants.zig");
-const render_settings = @import("render_settings.zig");
+
+const utils_zig = @import("utils_zig.zig");
+const utils_camera = @import("utils_camera.zig");
+const utils_logging = @import("utils_logging.zig");
+const utils_tile_rendering = @import("utils_tile_rendering.zig");
+
+const data_handles = @import("data_handle.zig");
+const data_color = @import("data_color.zig");
+const data_render_settings = @import("data_render_settings.zig");
 
 const maths_vec = @import("maths_vec.zig");
 const maths_mat = @import("maths_mat.zig");
@@ -18,8 +24,6 @@ const ControllereScene = @import("controller_scene.zig");
 const ControllereObject = @import("controller_object.zig");
 const ControllerAov = @import("controller_aov.zig");
 const ControllerImg = @import("controller_img.zig");
-
-const jp_color = @import("jp_color.zig");
 
 const Renderer = @This();
 
@@ -53,7 +57,7 @@ pub fn deinit(self: *Renderer) void {
 
 pub fn render(
     self: *Renderer,
-    camera_handle: handles.HandleCamera,
+    camera_handle: data_handles.HandleCamera,
     dir: []const u8,
     img_name: []const u8,
 ) !void {
@@ -63,18 +67,18 @@ pub fn render(
     self.render_info = try self.gen_render_info(camera_handle);
 
     switch (self.render_info.render_type) {
-        render_settings.RenderType.Tile => try render_tile(
+        data_render_settings.RenderType.Tile => try render_tile(
             self,
             camera_handle,
             self.render_info,
         ),
-        render_settings.RenderType.Scanline => unreachable,
-        render_settings.RenderType.SingleThread => unreachable,
+        data_render_settings.RenderType.Scanline => unreachable,
+        data_render_settings.RenderType.SingleThread => unreachable,
     }
 
     const time_end = std.time.timestamp();
     const time_elapsed = time_end - time_start;
-    const time_struct = format_time(time_elapsed);
+    const time_struct = utils_logging.format_time(time_elapsed);
     std.debug.print(
         "Rendered done in {d}h {d}m {d}s.\n",
         .{ time_struct.hour, time_struct.min, time_struct.sec },
@@ -87,7 +91,7 @@ pub fn render(
 
 pub fn render_tile(
     self: *Renderer,
-    camera_handle: handles.HandleCamera,
+    camera_handle: data_handles.HandleCamera,
     render_info: RenderInfo,
 ) !void {
     _ = camera_handle;
@@ -131,14 +135,14 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
             pxl_rendered_nbr,
         );
         if (tile_to_render_idx) |value| {
-            const tile_bounding_rectangle = get_tile_bouding_rectangle(
+            const tile_bounding_rectangle = utils_tile_rendering.get_tile_bouding_rectangle(
                 render_info.data_per_render_type.Tile.tile_x_number,
                 value,
                 render_info.data_per_render_type.Tile.tile_size,
                 render_info.image_width,
                 render_info.image_height,
             );
-            pxl_rendered_nbr = get_tile_pixel_number(tile_bounding_rectangle);
+            pxl_rendered_nbr = utils_tile_rendering.get_tile_pixel_number(tile_bounding_rectangle);
 
             var _x: u16 = tile_bounding_rectangle.x_min;
             var _y: u16 = undefined;
@@ -174,49 +178,8 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, pixel_payload
     _ = y;
     _ = self;
 
-    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Beauty, jp_color.JP_COLOR_RED);
-    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Normal, jp_color.JP_COLOR_GREY);
-}
-
-fn calculate_tile_number(
-    width: u16,
-    height: u16,
-    tile_size: u16,
-) maths_vec.Vec2(u16) {
-    var x_number = width / tile_size;
-    if (x_number * tile_size < width) {
-        x_number += 1;
-    }
-    var y_number = height / tile_size;
-    if (y_number * tile_size < height) {
-        y_number += 1;
-    }
-    return maths_vec.Vec2(u16){ .x = x_number, .y = y_number };
-}
-
-fn get_tile_bouding_rectangle(
-    tile_number_x: u16,
-    tile_id: u16,
-    tile_size: u16,
-    image_width: u16,
-    image_height: u16,
-) maths_mat.BoudingRectangleu16 {
-    const x_index: u16 = @rem(tile_id, tile_number_x);
-    const y_index: u16 = tile_id / (tile_number_x);
-    const ret = maths_mat.BoudingRectangleu16{
-        .x_min = x_index * tile_size,
-        .x_max = @min(x_index * tile_size + tile_size - 1, image_width - 1),
-        .y_min = y_index * tile_size,
-        .y_max = @min(y_index * tile_size + tile_size - 1, image_height - 1),
-    };
-    return ret;
-}
-
-fn get_tile_pixel_number(bouding_rectangle: maths_mat.BoudingRectangleu16) u16 {
-    const x_number = bouding_rectangle.x_max - bouding_rectangle.x_min;
-    const y_number = bouding_rectangle.y_max - bouding_rectangle.y_min;
-    const ret = @mulWithOverflow(x_number, y_number).@"0";
-    return ret;
+    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Beauty, data_color.COLOR_RED);
+    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Normal, data_color.COLOR_GREY);
 }
 
 // -- Prepare ----------------------------------------------------------------
@@ -238,14 +201,14 @@ const RenderInfo = struct {
     samples: u16,
     bounces: u16,
 
-    render_type: render_settings.RenderType,
+    render_type: data_render_settings.RenderType,
     focal_plane_center: maths_vec.Vec3f32,
     data_per_render_type: DataPerRenderType,
 
     samples_nbr: u16,
     samples_invert: f32,
 
-    const DataPerRenderType = union(render_settings.RenderType) {
+    const DataPerRenderType = union(data_render_settings.RenderType) {
         SingleThread: struct {},
         Scanline: struct {},
         Tile: struct {
@@ -257,7 +220,7 @@ const RenderInfo = struct {
     };
 };
 
-fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !RenderInfo {
+fn gen_render_info(self: *Renderer, camera_handle: data_handles.HandleCamera) !RenderInfo {
     var controller_object = self.controller_scene.controller_object;
     const scene_render_settings = self.controller_scene.render_settings;
 
@@ -272,24 +235,24 @@ fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !Render
     const focal_length: f32 = ptr_cam_entity.*.focal_length;
     const field_of_view: f32 = ptr_cam_entity.*.field_of_view;
 
-    const tile_x_y: maths_vec.Vec2(u16) = calculate_tile_number(
+    const tile_x_y: maths_vec.Vec2(u16) = utils_tile_rendering.calculate_tile_number(
         image_width,
         image_height,
         scene_render_settings.tile_size,
     );
 
-    const cam_direction: maths_vec.Vec3f32 = get_camera_absolute_direction(
+    const cam_direction: maths_vec.Vec3f32 = utils_camera.get_camera_absolute_direction(
         ptr_cam_tmatrix.*,
         ControllereObject.Camera.CAMERA_DIRECTION,
     );
 
-    const cam_focal_plane_center: maths_vec.Vec3f32 = get_camera_focal_plane_center(
+    const cam_focal_plane_center: maths_vec.Vec3f32 = utils_camera.get_camera_focal_plane_center(
         ptr_cam_tmatrix.*,
         cam_direction,
         focal_length,
     );
 
-    const pixel_size: f32 = get_pixel_size_on_focal_plane(
+    const pixel_size: f32 = utils_camera.get_pixel_size_on_focal_plane(
         focal_length,
         field_of_view,
         image_width,
@@ -310,7 +273,7 @@ fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !Render
         .bounces = scene_render_settings.bounces,
         .focal_plane_center = cam_focal_plane_center,
         .data_per_render_type = switch (scene_render_settings.render_type) {
-            render_settings.RenderType.Tile => RenderInfo.DataPerRenderType{
+            data_render_settings.RenderType.Tile => RenderInfo.DataPerRenderType{
                 .Tile = .{
                     .tile_size = scene_render_settings.tile_size,
                     .tile_number = tile_x_y.x * tile_x_y.y,
@@ -318,8 +281,8 @@ fn gen_render_info(self: *Renderer, camera_handle: handles.HandleCamera) !Render
                     .tile_y_number = tile_x_y.y,
                 },
             },
-            render_settings.RenderType.Scanline => unreachable,
-            render_settings.RenderType.SingleThread => unreachable,
+            data_render_settings.RenderType.Scanline => unreachable,
+            data_render_settings.RenderType.SingleThread => unreachable,
         },
     };
 }
@@ -335,7 +298,7 @@ const RenderingSharedData = struct {
 
     const DELAY_BETWEEN_PERCENT_DISPLAY_S = 2;
 
-    const DataPerRenderType = union(render_settings.RenderType) {
+    const DataPerRenderType = union(data_render_settings.RenderType) {
         SingleThread: struct {},
         Scanline: struct {},
         Tile: struct {
@@ -361,15 +324,15 @@ const RenderingSharedData = struct {
             .last_percent_display_time = 0,
             .pixel_total_nb = px_number_ret.@"0",
             .data_per_render_type = switch (render_info.data_per_render_type) {
-                render_settings.RenderType.Tile => RenderingSharedData.DataPerRenderType{
+                data_render_settings.RenderType.Tile => RenderingSharedData.DataPerRenderType{
                     .Tile = .{
                         .next_tile_to_render = 0,
                         .tile_already_rendered = 0,
                         .tile_number = render_info.data_per_render_type.Tile.tile_number,
                     },
                 },
-                render_settings.RenderType.Scanline => unreachable,
-                render_settings.RenderType.SingleThread => unreachable,
+                data_render_settings.RenderType.Scanline => unreachable,
+                data_render_settings.RenderType.SingleThread => unreachable,
             },
         };
     }
@@ -391,7 +354,7 @@ const RenderingSharedData = struct {
         if (before == 0 or (now - before) > DELAY_BETWEEN_PERCENT_DISPLAY_S or current_percent_done_f64 == 100) {
             self.last_percent_display = current_percent_done;
             self.last_percent_display_time = now;
-            log_progress(current_percent_done);
+            utils_logging.log_progress(current_percent_done);
         }
     }
 
@@ -404,7 +367,7 @@ const RenderingSharedData = struct {
         defer self.mutex.unlock();
 
         const render_tile_data = switch (self.data_per_render_type) {
-            render_settings.RenderType.Tile => &self.data_per_render_type.Tile,
+            data_render_settings.RenderType.Tile => &self.data_per_render_type.Tile,
             else => unreachable,
         };
 
@@ -428,18 +391,18 @@ const RenderingSharedData = struct {
 };
 
 const PixelPayload = struct {
-    aov_to_color: std.AutoHashMap(ControllerAov.AovStandard, jp_color.JpColor),
+    aov_to_color: std.AutoHashMap(ControllerAov.AovStandard, data_color.Color),
     sample_nbr_invert: f32,
 
     const Self = @This();
 
     pub fn init(controller_aov: *ControllerAov, sample_nbr_invert: f32) !Self {
         var ret = .{
-            .aov_to_color = std.AutoHashMap(ControllerAov.AovStandard, jp_color.JpColor).init(gpa),
+            .aov_to_color = std.AutoHashMap(ControllerAov.AovStandard, data_color.Color).init(gpa),
             .sample_nbr_invert = sample_nbr_invert,
         };
         for (controller_aov.array_aov_standard.items) |aov| {
-            try ret.aov_to_color.put(aov, jp_color.JP_COLOR_BlACK);
+            try ret.aov_to_color.put(aov, data_color.COLOR_BlACK);
         }
         return ret;
     }
@@ -451,14 +414,14 @@ const PixelPayload = struct {
     pub fn reset(self: Self) void {
         var it = self.aov_to_color.iterator();
         while (it.next()) |item| {
-            item.value_ptr.* = jp_color.JP_COLOR_BlACK;
+            item.value_ptr.* = data_color.COLOR_BlACK;
         }
     }
 
     pub fn add_sample_to_aov(
         self: *Self,
         aov_standard: ControllerAov.AovStandard,
-        value: jp_color.JpColor,
+        value: data_color.Color,
     ) void {
         const aov_ptr = self.aov_to_color.getPtr(aov_standard); // TODO: check for key existence....
         const sampled_value = value.multiply(self.sample_nbr_invert);
@@ -466,103 +429,7 @@ const PixelPayload = struct {
     }
 };
 
-fn get_camera_absolute_direction(
-    tmatrix: maths_tmat.TMatrix,
-    relative_direction: maths_vec.Vec3f32,
-) maths_vec.Vec3f32 {
-    const tmp: maths_vec.Vec3f32 = tmatrix.multiply_with_vec3(relative_direction);
-    return tmp.normalize();
-}
-
-fn get_camera_focal_plane_center(
-    tmatrix: maths_tmat.TMatrix,
-    absolute_direction: maths_vec.Vec3f32,
-    focal_length: f32,
-) maths_vec.Vec3f32 {
-    const weighted_direction = absolute_direction.product_scalar(focal_length);
-    const camera_position = tmatrix.get_position();
-    return camera_position.sum_vector(weighted_direction);
-}
-
-fn get_pixel_size_on_focal_plane(
-    focal_length: f32,
-    field_of_view: f32,
-    img_width: u16,
-) f32 {
-    const half_fov: f32 = field_of_view / 2;
-    const half_fov_radiant: f32 = half_fov * (std.math.pi / 180.0);
-    const focal_plane_width: f32 = (@tan(half_fov_radiant) * focal_length) * 2;
-    const img_width_as_f32 = zig_utils.cast_u16_to_f32(img_width);
-    return focal_plane_width / img_width_as_f32;
-}
-
-// -- Utils ------------------------------------------------------------------
-
-fn log_progress(progress_percent: u16) void {
-    var progress = [10]u8{ '.', '.', '.', '.', '.', '.', '.', '.', '.', '.' };
-    const done: u16 = @min(progress_percent / 10, 10);
-
-    for (0..done) |i| {
-        progress[i] = ':';
-    }
-    std.debug.print("Render progression : [{s}] {d}%\n", .{ progress, progress_percent });
-    // std.log.info("Render progression : [{s}] {d}%\n", .{ progress, progress_percent });
-}
-
-// fn log_render_info(render_info: RenderInfo) void {
-// }
-
-fn format_time(time_epoch: i64) struct { hour: u8, min: u8, sec: u8 } {
-    if (time_epoch < 0) unreachable;
-    const time_epoch_pos: u32 = @intCast(time_epoch);
-
-    const min_total = time_epoch_pos / std.time.s_per_min;
-    const sec = @rem(time_epoch_pos, 60);
-    const hour = min_total / 60;
-    const min = @rem(min_total, 60);
-
-    const sec_u8: u8 = @intCast(sec);
-    const min_u8: u8 = @intCast(min);
-    const hour_u8: u8 = @intCast(hour);
-
-    return .{
-        .hour = hour_u8,
-        .min = min_u8,
-        .sec = sec_u8,
-    };
-}
-
 // -- Tests ------------------------------------------------------------------
-
-test "u_tiling" {
-    const tile_info = calculate_tile_number(1920, 1080, 64);
-    try std.testing.expectEqual(30, tile_info.x);
-    try std.testing.expectEqual(17, tile_info.y);
-
-    const bounding_rectangle_1 = get_tile_bouding_rectangle(
-        tile_info.x,
-        0,
-        64,
-        1920,
-        1080,
-    );
-    try std.testing.expectEqual(0, bounding_rectangle_1.x_min);
-    try std.testing.expectEqual(63, bounding_rectangle_1.x_max);
-    try std.testing.expectEqual(0, bounding_rectangle_1.y_min);
-    try std.testing.expectEqual(63, bounding_rectangle_1.y_max);
-
-    const bounding_rectangle_2 = get_tile_bouding_rectangle(
-        tile_info.x,
-        52,
-        64,
-        1920,
-        1080,
-    );
-    try std.testing.expectEqual(1408, bounding_rectangle_2.x_min);
-    try std.testing.expectEqual(1471, bounding_rectangle_2.x_max);
-    try std.testing.expectEqual(64, bounding_rectangle_2.y_min);
-    try std.testing.expectEqual(127, bounding_rectangle_2.y_max);
-}
 
 test "i_prepare_render" {
     var controller_scene = ControllereScene.init();
@@ -571,13 +438,13 @@ test "i_prepare_render" {
     controller_scene.render_settings.width = 1920;
     controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 6;
+    controller_scene.render_settings.samples = 2;
 
     try controller_scene.controller_aov.add_aov_standard(ControllerAov.AovStandard.Beauty);
     try controller_scene.controller_aov.add_aov_standard(ControllerAov.AovStandard.Alpha);
     try controller_scene.controller_aov.add_aov_standard(ControllerAov.AovStandard.Normal);
 
-    const cam_1_handle: handles.HandleCamera = try controller_scene.controller_object.add_camera("camera1");
+    const cam_1_handle: data_handles.HandleCamera = try controller_scene.controller_object.add_camera("camera1");
 
     var renderer = Renderer.init(&controller_scene);
     defer renderer.deinit();

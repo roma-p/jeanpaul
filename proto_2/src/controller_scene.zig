@@ -4,7 +4,7 @@ const gpa = std.heap.page_allocator;
 
 const ControllerObject = @import("controller_object.zig");
 const ControllerAov = @import("controller_aov.zig");
-const RenderSettings = @import("render_settings.zig");
+const RenderSettings = @import("data_render_settings.zig");
 
 pub const ControllerScene = @This();
 

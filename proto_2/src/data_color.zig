@@ -1,27 +1,27 @@
 const std = @import("std");
 
 // values are betwen 0 and 1.
-pub const JpColor = struct {
+pub const Color = struct {
     r: f32 = undefined,
     g: f32 = undefined,
     b: f32 = undefined,
 
-    pub fn multiply(self: *const JpColor, x: f32) JpColor {
-        return JpColor{
+    pub fn multiply(self: *const Color, x: f32) Color {
+        return Color{
             .r = _clamp(x * self.r),
             .g = _clamp(x * self.g),
             .b = _clamp(x * self.b),
         };
     }
 
-    pub fn add_color(self: *JpColor, color: JpColor) void {
+    pub fn add_color(self: *Color, color: Color) void {
         self.r = _clamp(self.r + color.r);
         self.g = _clamp(self.g + color.g);
         self.b = _clamp(self.b + color.b);
     }
 
-    pub fn sum_color(self: *const JpColor, color: JpColor) JpColor {
-        return JpColor{
+    pub fn sum_color(self: *const Color, color: Color) Color {
+        return Color{
             .r = _clamp(self.r + color.r),
             .g = _clamp(self.g + color.g),
             .b = _clamp(self.b + color.b),
@@ -29,10 +29,10 @@ pub const JpColor = struct {
     }
 
     pub fn multiply_with_other_color(
-        self: *const JpColor,
-        color: *const JpColor,
-    ) JpColor {
-        return JpColor{
+        self: *const Color,
+        color: *const Color,
+    ) Color {
+        return Color{
             .r = _clamp(self.r * color.r),
             .g = _clamp(self.g * color.g),
             .b = _clamp(self.b * color.b),
@@ -44,15 +44,15 @@ pub const JpColor = struct {
     }
 };
 
-pub const JP_COLOR_BlACK = JpColor{ .r = 0, .g = 0, .b = 0 };
-pub const JP_COLOR_WHITE = JpColor{ .r = 1, .g = 1, .b = 1 };
-pub const JP_COLOR_RED = JpColor{ .r = 1, .g = 0, .b = 0 };
-pub const JP_COLOR_GREEN = JpColor{ .r = 0, .g = 1, .b = 0 };
-pub const JP_COLOR_BLUE = JpColor{ .r = 0, .g = 0, .b = 1 };
-pub const JP_COLOR_GREY = JpColor{ .r = 0.5, .g = 0.5, .b = 0.5 };
+pub const COLOR_BlACK = Color{ .r = 0, .g = 0, .b = 0 };
+pub const COLOR_WHITE = Color{ .r = 1, .g = 1, .b = 1 };
+pub const COLOR_RED = Color{ .r = 1, .g = 0, .b = 0 };
+pub const COLOR_GREEN = Color{ .r = 0, .g = 1, .b = 0 };
+pub const COLOR_BLUE = Color{ .r = 0, .g = 0, .b = 1 };
+pub const COLOR_GREY = Color{ .r = 0.5, .g = 0.5, .b = 0.5 };
 
-pub const JP_COLOR_EMPTY = JpColor{ .r = 0.5, .g = 0, .b = 0.5 };
-pub const JP_COLOR_DEFAULT = JP_COLOR_GREY;
+pub const COLOR_EMPTY = Color{ .r = 0.5, .g = 0, .b = 0.5 };
+pub const COLOR_DEFAULT = COLOR_GREY;
 
 pub fn cast_jp_color_to_u8(color_value: f32) u8 {
     var calibrated_value = color_value;

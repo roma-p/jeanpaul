@@ -5,12 +5,8 @@ const Thread = std.Thread;
 const Mutex = Thread.Mutex;
 
 const maths_mat = @import("maths_mat.zig");
-const jp_color = @import("jp_color.zig");
-
-const JpColor = jp_color.JpColor;
-const JP_COLOR_BlACK = jp_color.JP_COLOR_BlACK;
-
-// TODO: rewrite this this everything inside a struct!!!
+const data_color = @import("data_color.zig");
+const data_img = @import("data_img.zig");
 
 pub const ControllerImg = @This();
 
@@ -18,14 +14,14 @@ width: u16 = undefined,
 height: u16 = undefined,
 mutex_write_to_img: Mutex = undefined,
 
-array_image_layer: std.ArrayList(*maths_mat.Matrix(JpColor)),
+array_image_layer: std.ArrayList(*data_img.Img),
 array_layer_name: std.ArrayList([]const u8),
 
 pub fn init(width: u16, height: u16) ControllerImg {
     const ret = ControllerImg{
         .width = width,
         .height = height,
-        .array_image_layer = std.ArrayList(*maths_mat.Matrix(JpColor)).init(gpa),
+        .array_image_layer = std.ArrayList(*data_img.Img).init(gpa),
         .array_layer_name = std.ArrayList([]const u8).init(gpa),
         .mutex_write_to_img = Mutex{},
     };
@@ -46,11 +42,11 @@ pub fn register_image_layer(
 ) !usize {
     // TODO: check if name free...
     const ret = self.array_image_layer.items.len;
-    const m = try gpa.create(maths_mat.Matrix(JpColor));
-    m.* = maths_mat.Matrix(JpColor).init(
+    const m = try gpa.create(data_img.Img);
+    m.* = data_img.Img.init(
         self.width,
         self.height,
-        JP_COLOR_BlACK,
+        data_color.COLOR_BlACK,
         &gpa,
     );
     try self.array_image_layer.append(m);
@@ -58,14 +54,25 @@ pub fn register_image_layer(
     return ret;
 }
 
-pub fn write_to_px_thread_safe(self: *ControllerImg, x: u16, y: u16, c: jp_color.JpColor) void {
+pub fn write_to_px_thread_safe(
+    self: *ControllerImg,
+    x: u16,
+    y: u16,
+    c: data_color.Color,
+) void {
     self.mutex_write_to_img.lock();
     defer self.mutex_write_to_img.unlock();
     // tmp method, no layer...
     self.array_image_layer.items[0].*.data[x][y] = c;
 }
 
-pub fn write_to_px(self: *ControllerImg, x: u16, y: u16, layer_index: usize, c: jp_color.JpColor) void {
+pub fn write_to_px(
+    self: *ControllerImg,
+    x: u16,
+    y: u16,
+    layer_index: usize,
+    c: data_color.Color,
+) void {
     // TODO: check layer_index < len !!!!!
     self.array_image_layer.items[layer_index].*.data[x][y] = c;
 }
@@ -138,9 +145,9 @@ fn _write_ppm_single_layer(
                 &buffer_line,
                 "\n{} {} {}",
                 .{
-                    jp_color.cast_jp_color_to_u8(px.r),
-                    jp_color.cast_jp_color_to_u8(px.g),
-                    jp_color.cast_jp_color_to_u8(px.b),
+                    data_color.cast_jp_color_to_u8(px.r),
+                    data_color.cast_jp_color_to_u8(px.g),
+                    data_color.cast_jp_color_to_u8(px.b),
                 },
             );
             try writer.writeAll(buffer_line_content);
