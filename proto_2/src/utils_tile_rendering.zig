@@ -18,7 +18,8 @@ pub fn calculate_tile_number(
     return maths_vec.Vec2(u16){ .x = x_number, .y = y_number };
 }
 
-pub fn get_tile_bouding_rectangle(
+// TODO: center mode && triangle mode.
+pub fn get_tile_bouding_rectangle_line_mode(
     tile_number_x: u16,
     tile_id: u16,
     tile_size: u16,
@@ -50,7 +51,7 @@ test "u_tiling" {
     try std.testing.expectEqual(30, tile_info.x);
     try std.testing.expectEqual(17, tile_info.y);
 
-    const bounding_rectangle_1 = get_tile_bouding_rectangle(
+    const bounding_rectangle_1 = get_tile_bouding_rectangle_line_mode(
         tile_info.x,
         0,
         64,
@@ -62,7 +63,7 @@ test "u_tiling" {
     try std.testing.expectEqual(0, bounding_rectangle_1.y_min);
     try std.testing.expectEqual(63, bounding_rectangle_1.y_max);
 
-    const bounding_rectangle_2 = get_tile_bouding_rectangle(
+    const bounding_rectangle_2 = get_tile_bouding_rectangle_line_mode(
         tile_info.x,
         52,
         64,

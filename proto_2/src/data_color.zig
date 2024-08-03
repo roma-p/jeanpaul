@@ -6,7 +6,7 @@ pub const Color = struct {
     g: f32 = undefined,
     b: f32 = undefined,
 
-    pub fn multiply(self: *const Color, x: f32) Color {
+    pub fn multiply(self: Color, x: f32) Color {
         return Color{
             .r = _clamp(x * self.r),
             .g = _clamp(x * self.g),
@@ -14,13 +14,13 @@ pub const Color = struct {
         };
     }
 
-    pub fn add_color(self: *Color, color: Color) void {
+    pub fn sum_to_color(self: *Color, color: Color) void {
         self.r = _clamp(self.r + color.r);
         self.g = _clamp(self.g + color.g);
         self.b = _clamp(self.b + color.b);
     }
 
-    pub fn sum_color(self: *const Color, color: Color) Color {
+    pub fn sum_color(self: Color, color: Color) Color {
         return Color{
             .r = _clamp(self.r + color.r),
             .g = _clamp(self.g + color.g),
@@ -28,9 +28,9 @@ pub const Color = struct {
         };
     }
 
-    pub fn multiply_with_other_color(
-        self: *const Color,
-        color: *const Color,
+    pub fn multiply_color(
+        self: Color,
+        color: Color,
     ) Color {
         return Color{
             .r = _clamp(self.r * color.r),
@@ -67,4 +67,38 @@ pub fn cast_jp_color_to_u8(color_value: f32) u8 {
     const as_int: i32 = @intFromFloat(calibrated_value);
     const as_u8: u8 = @intCast(as_int);
     return as_u8;
+}
+
+test "multiply" {
+    const c = COLOR_GREY.multiply(0.3);
+    try std.testing.expectEqual(0.15, c.r);
+    try std.testing.expectEqual(0.15, c.g);
+    try std.testing.expectEqual(0.15, c.b);
+}
+
+test "sum_to_color" {
+    var c1 = Color{ .r = 1, .g = 0.5, .b = 0 };
+    const c2 = Color{ .r = 0.1, .g = 0.5, .b = 0.3 };
+    c1.sum_to_color(c2);
+    try std.testing.expectEqual(1, c1.r);
+    try std.testing.expectEqual(1, c1.g);
+    try std.testing.expectEqual(0.3, c1.b);
+}
+
+test "sum_color" {
+    const c1 = Color{ .r = 1, .g = 0.5, .b = 0 };
+    const c2 = Color{ .r = 0.1, .g = 0.5, .b = 0.3 };
+    const c3 = c1.sum_color(c2);
+    try std.testing.expectEqual(1, c3.r);
+    try std.testing.expectEqual(1, c3.g);
+    try std.testing.expectEqual(0.3, c3.b);
+}
+
+test "multiply_color" {
+    const c1 = Color{ .r = 1, .g = 0.5, .b = 0 };
+    const c2 = Color{ .r = 0.1, .g = 0.5, .b = 0.3 };
+    const c3 = c1.multiply_color(c2);
+    try std.testing.expectEqual(0.1, c3.r);
+    try std.testing.expectEqual(0.25, c3.g);
+    try std.testing.expectEqual(0, c3.b);
 }

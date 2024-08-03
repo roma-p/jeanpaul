@@ -5,17 +5,21 @@ const Thread = std.Thread;
 const Mutex = Thread.Mutex;
 
 const maths_mat = @import("maths_mat.zig");
+const maths_vec = @import("maths_vec.zig");
 const data_color = @import("data_color.zig");
 const data_img = @import("data_img.zig");
+
+const utils_draw_2d = @import("utils_draw_2d.zig");
 
 pub const ControllerImg = @This();
 
 width: u16 = undefined,
 height: u16 = undefined,
-mutex_write_to_img: Mutex = undefined,
 
 array_image_layer: std.ArrayList(*data_img.Img),
 array_layer_name: std.ArrayList([]const u8),
+
+const ErrorControllerImg = error{ NameAlreadyTaken, InvalidPixel };
 
 pub fn init(width: u16, height: u16) ControllerImg {
     const ret = ControllerImg{
@@ -23,7 +27,6 @@ pub fn init(width: u16, height: u16) ControllerImg {
         .height = height,
         .array_image_layer = std.ArrayList(*data_img.Img).init(gpa),
         .array_layer_name = std.ArrayList([]const u8).init(gpa),
-        .mutex_write_to_img = Mutex{},
     };
     return ret;
 }
@@ -40,7 +43,11 @@ pub fn register_image_layer(
     self: *ControllerImg,
     layer_name: []const u8,
 ) !usize {
-    // TODO: check if name free...
+    for (self.array_layer_name.items) |v| {
+        if (std.mem.eql(u8, v, layer_name)) {
+            return ErrorControllerImg.NameAlreadyTaken;
+        }
+    }
     const ret = self.array_image_layer.items.len;
     const m = try gpa.create(data_img.Img);
     m.* = data_img.Img.init(
@@ -54,26 +61,16 @@ pub fn register_image_layer(
     return ret;
 }
 
-pub fn write_to_px_thread_safe(
-    self: *ControllerImg,
-    x: u16,
-    y: u16,
-    c: data_color.Color,
-) void {
-    self.mutex_write_to_img.lock();
-    defer self.mutex_write_to_img.unlock();
-    // tmp method, no layer...
-    self.array_image_layer.items[0].*.data[x][y] = c;
-}
-
 pub fn write_to_px(
     self: *ControllerImg,
     x: u16,
     y: u16,
     layer_index: usize,
     c: data_color.Color,
-) void {
-    // TODO: check layer_index < len !!!!!
+) ErrorControllerImg!void {
+    if (x >= self.width or y >= self.height) {
+        return ErrorControllerImg.InvalidPixel;
+    }
     self.array_image_layer.items[layer_index].*.data[x][y] = c;
 }
 
@@ -163,6 +160,21 @@ test "controller_img" {
     controller_img.array_image_layer.items[0].*.data[0][0].r = 1;
     controller_img.array_image_layer.items[0].*.data[0][0].g = 1;
     controller_img.array_image_layer.items[0].*.data[0][0].b = 1;
+    try controller_img.write_to_px(1, 1, 1, data_color.COLOR_RED);
+
+    utils_draw_2d.draw_circle(
+        controller_img.array_image_layer.items[0],
+        maths_vec.Vec2u16{ .x = 1000, .y = 200 },
+        250,
+        data_color.COLOR_GREEN,
+    );
+    utils_draw_2d.draw_rectangle(
+        controller_img.array_image_layer.items[0],
+        maths_vec.Vec2u16{ .x = 300, .y = 700 },
+        maths_vec.Vec2u16{ .x = 400, .y = 500 },
+        data_color.COLOR_RED,
+    );
+
     try controller_img.write_ppm("tests", "test");
     controller_img.deinit();
 }

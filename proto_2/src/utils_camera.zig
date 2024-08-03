@@ -16,7 +16,7 @@ pub fn get_camera_focal_plane_center(
     absolute_direction: maths_vec.Vec3f32,
     focal_length: f32,
 ) maths_vec.Vec3f32 {
-    const weighted_direction = absolute_direction.product_scalar(focal_length);
+    const weighted_direction = absolute_direction.product(focal_length);
     const camera_position = tmatrix.get_position();
     return camera_position.sum_vector(weighted_direction);
 }

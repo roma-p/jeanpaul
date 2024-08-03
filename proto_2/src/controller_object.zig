@@ -5,23 +5,34 @@ const gpa = std.heap.page_allocator;
 const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
 
+const Vec3f32 = maths_vec.Vec3f32;
+const TMatrix = maths_tmat.TMatrix;
+
 const data_handles = @import("data_handle.zig");
 
 pub const ControllerObject = @This();
 
-const SceneError = error{ NameAlreadyTaken, InvalidHandle };
+const ErrorControllerObject = error{ NameAlreadyTaken, InvalidHandle };
 
+// Assuming one default material was created.
+const HANDLE_DEFAULT_MATERIAL = data_handles.HandleMaterial{ .idx = 0 };
+
+// "entities"
 array_camera: std.ArrayList(?Camera),
 array_shape: std.ArrayList(?Shape),
-array_tmatrix: std.ArrayList(?maths_tmat.TMatrix),
+array_env: std.ArrayList(?Environment),
+
+// "components"
+array_tmatrix: std.ArrayList(?TMatrix),
 array_name: std.ArrayList(?[]const u8),
 
 pub fn init() ControllerObject {
     return .{
         .array_name = std.ArrayList(?[]const u8).init(gpa),
-        .array_tmatrix = std.ArrayList(?maths_tmat.TMatrix).init(gpa),
+        .array_tmatrix = std.ArrayList(?TMatrix).init(gpa),
         .array_camera = std.ArrayList(?Camera).init(gpa),
         .array_shape = std.ArrayList(?Shape).init(gpa),
+        .array_env = std.ArrayList(?Environment).init(gpa),
     };
 }
 
@@ -30,6 +41,7 @@ pub fn deinit(self: *ControllerObject) void {
     self.array_tmatrix.deinit();
     self.array_camera.deinit();
     self.array_shape.deinit();
+    self.array_env.deinit();
 }
 
 pub const Camera = struct {
@@ -39,7 +51,7 @@ pub const Camera = struct {
     focal_length: f32 = 10,
     field_of_view: f32 = 60,
 
-    pub const CAMERA_DIRECTION = maths_vec.Vec3f32.create_z_neg();
+    pub const CAMERA_DIRECTION = Vec3f32.create_z_neg();
 
     pub const Tag = enum { CameraPersp };
 };
@@ -48,24 +60,47 @@ pub const Shape = struct {
     tag: Tag,
     data: Data,
     handle_name: data_handles.HandleObjectName,
-    handle_material: usize, // TODO
+    handle_material: data_handles.HandleMaterial,
     handle_tmatrix: data_handles.HandleTMatrix,
 
-    const IMPLICIT_PLANE_DIRECTION = maths_vec.Vec3f32.create_y();
+    const IMPLICIT_PLANE_DIRECTION = Vec3f32.create_y();
 
-    const Tag = enum {
+    pub const Tag = enum {
         ImplicitSphere,
         ImplicitPlane,
     };
 
+    // TODO: PUT THIS IN "MODEL DEFINITION"...
     const Data = union(Tag) {
         ImplicitSphere: struct {
             radius: f32 = 10,
         },
         ImplicitPlane: struct {
-            normal: maths_vec.Vec3f32 = maths_vec.Vec3f32.create_y(),
+            normal: Vec3f32 = Vec3f32.create_y(),
         },
     };
+};
+
+pub const Environment = struct {
+    tag: Tag,
+    data: Data,
+    handle_name: data_handles.HandleObjectName,
+
+    pub const Tag = enum { SkyDome };
+
+    const Data = union(Tag) {
+        SkyDome: struct {
+            handle_material: data_handles.HandleMaterial,
+        },
+    };
+};
+
+pub const ObjectPointerEnum = union(data_handles.HandleObjectAllEnum) {
+    HandleCamera: *const Camera,
+    HandleShape: *const Shape,
+    HandleEnv: *const Environment,
+    HandleObjectName: *const []u8,
+    HandleTMatrix: *const TMatrix,
 };
 
 pub fn add_camera(
@@ -73,7 +108,11 @@ pub fn add_camera(
     name: []const u8,
 ) !data_handles.HandleCamera {
     const handle_name: data_handles.HandleObjectName = try self._add_name(name);
+    errdefer self._remove_name(handle_name);
+
     const handle_tmatrix: data_handles.HandleTMatrix = try self._add_tmatrix();
+    errdefer self._remove_tmatrix(handle_tmatrix);
+
     const handle_camera = data_handles.HandleCamera{
         .idx = self.array_camera.items.len,
     };
@@ -92,13 +131,17 @@ pub fn add_shape(
     tag: Shape.Tag,
 ) !data_handles.HandleShape {
     const handle_name: data_handles.HandleObjectName = try self._add_name(name);
+    errdefer self._remove_name(handle_name);
+
     const handle_tmatrix: data_handles.HandleTMatrix = try self._add_tmatrix();
+    errdefer self._remove_tmatrix(handle_tmatrix);
+
     const handle_shape = data_handles.HandleShape{ .idx = self.array_shape.items.len };
 
     try self.array_shape.append(Shape{
         .handle_name = handle_name,
         .handle_tmatrix = handle_tmatrix,
-        .handle_material = 0, // TODO
+        .handle_material = HANDLE_DEFAULT_MATERIAL,
         .tag = tag,
         .data = switch (tag) {
             Shape.Tag.ImplicitSphere => Shape.Data{ .ImplicitSphere = .{} },
@@ -108,43 +151,114 @@ pub fn add_shape(
     return handle_shape;
 }
 
-pub fn get_camera_pointer(self: *const ControllerObject, handle: data_handles.HandleCamera) SceneError!*const Camera {
+// TEST ME!
+pub fn add_env(
+    self: *ControllerObject,
+    name: []const u8,
+    tag: Environment.Tag,
+) !data_handles.HandleEnv {
+    const handle_name: data_handles.HandleObjectName = try self._add_name(name);
+    errdefer self._remove_name(handle_name);
+    const handle_env = data_handles.HandleEnv{ .idx = self.array_shape.items.len };
+
+    try self.array_env.append(Environment{
+        .handle_name = handle_name,
+        .tag = tag,
+        .data = switch (tag) {
+            Environment.Tag.SkyDome => Environment.Data{
+                .SkyDome = .{ .handle_material = HANDLE_DEFAULT_MATERIAL },
+            }, // TODO
+        },
+    });
+    return handle_env;
+}
+
+// TODO: make this generic using comptime?
+
+pub fn get_camera_pointer(
+    self: *ControllerObject,
+    handle: data_handles.HandleCamera,
+) ErrorControllerObject!*Camera {
     if (handle.idx > self.array_camera.items.len) {
-        return SceneError.InvalidHandle;
+        return ErrorControllerObject.InvalidHandle;
     }
-    const val = self.array_camera.items[handle.idx] orelse return SceneError.InvalidHandle;
-    return &val;
+    if (self.array_camera.items[handle.idx]) |*v| {
+        return v;
+    } else {
+        return ErrorControllerObject.InvalidHandle;
+    }
 }
 
-pub fn get_shape_pointer(self: *const ControllerObject, handle: data_handles.HandleShape) SceneError!*const Shape {
+pub fn get_shape_pointer(
+    self: *ControllerObject,
+    handle: data_handles.HandleShape,
+) ErrorControllerObject!*Shape {
     if (handle.idx > self.array_shape.items.len) {
-        return SceneError.InvalidHandle;
+        return ErrorControllerObject.InvalidHandle;
     }
-    const val = self.array_shape.items[handle.idx] orelse return SceneError.InvalidHandle;
-    return &val;
+    if (self.array_shape.items[handle.idx]) |*v| {
+        return v;
+    } else {
+        return ErrorControllerObject.InvalidHandle;
+    }
 }
 
-pub fn get_object_name_pointer(self: *const ControllerObject, handle: data_handles.HandleObjectName) SceneError!*const []u8 {
+pub fn get_env_pointer(
+    self: *ControllerObject,
+    handle: data_handles.HandleEnv,
+) ErrorControllerObject!*Environment {
+    if (handle.idx > self.array_env.items.len) {
+        return ErrorControllerObject.InvalidHandle;
+    }
+    if (self.array_env.items[handle.idx]) |*v| {
+        return v;
+    } else {
+        return ErrorControllerObject.InvalidHandle;
+    }
+}
+
+pub fn get_object_name_pointer(
+    self: *ControllerObject,
+    handle: data_handles.HandleObjectName,
+) ErrorControllerObject!*const []u8 {
     if (handle.idx > self.array_name.items.len) {
-        return SceneError.InvalidHandle;
+        return ErrorControllerObject.InvalidHandle;
     }
-    const val = self.array_name.items[handle.idx] orelse return SceneError.InvalidHandle;
-    return &val;
+    if (self.array_name.items[handle.idx]) |*v| {
+        return v;
+    } else {
+        return ErrorControllerObject.InvalidHandle;
+    }
 }
 
-pub fn get_tmatrix_pointer(self: *const ControllerObject, handle: data_handles.HandleTMatrix) SceneError!*const maths_tmat.TMatrix {
+pub fn get_tmatrix_pointer(
+    self: *ControllerObject,
+    handle: data_handles.HandleTMatrix,
+) ErrorControllerObject!*TMatrix {
     if (handle.idx > self.array_tmatrix.items.len) {
-        return SceneError.InvalidHandle;
+        return ErrorControllerObject.InvalidHandle;
     }
-    const val = self.array_tmatrix.items[handle.idx] orelse return SceneError.InvalidHandle;
-    return &val;
+    if (self.array_tmatrix.items[handle.idx]) |*v| {
+        return v;
+    } else {
+        return ErrorControllerObject.InvalidHandle;
+    }
+}
+
+pub fn set_position_from_tmatrix_handle(
+    self: *ControllerObject,
+    handle: data_handles.HandleTMatrix,
+    pos: Vec3f32,
+) ErrorControllerObject!void {
+    const ptr = try self.get_tmatrix_pointer(handle);
+    ptr.set_position(pos);
 }
 
 fn _add_name(self: *ControllerObject, name: []const u8) !data_handles.HandleObjectName {
     for (self.array_name.items) |existing_name| {
         if (existing_name) |value| {
             if (std.mem.eql(u8, value, name)) {
-                return SceneError.NameAlreadyTaken;
+                return ErrorControllerObject.NameAlreadyTaken;
             }
         }
     }
@@ -153,64 +267,102 @@ fn _add_name(self: *ControllerObject, name: []const u8) !data_handles.HandleObje
     return data_handles.HandleObjectName{ .idx = idx };
 }
 
+fn _remove_name(self: *ControllerObject, handle: data_handles.HandleObjectName) void {
+    if (handle.idx > self.array_name.items.len) return;
+    if (self.array_name.items[handle.idx] != null) {
+        self.array_name.items[handle.idx] = null;
+    }
+}
+
 fn _add_tmatrix(self: *ControllerObject) !data_handles.HandleTMatrix {
     const idx: usize = self.array_tmatrix.items.len;
-    try self.array_tmatrix.append(maths_tmat.TMatrix{});
+    try self.array_tmatrix.append(TMatrix.create_identity());
     return data_handles.HandleTMatrix{ .idx = idx };
 }
 
-test "co_init_deinit" {
+fn _remove_tmatrix(self: *ControllerObject, handle: data_handles.HandleTMatrix) void {
+    if (handle.idx > self.array_tmatrix.items.len) return;
+    if (self.array_tmatrix.items[handle.idx] != null) {
+        self.array_name.items[handle.idx] = null;
+    }
+}
+
+test "i_init_deinit" {
     var controller = ControllerObject.init();
     controller.deinit();
 }
 
-test "co_add_camera" {
+test "u_add_get_camera" {
     // first valid camera.
     var controller = ControllerObject.init();
-    const cam_1_handle: data_handles.HandleCamera = try controller.add_camera("camera1");
-    try std.testing.expectEqual(0, cam_1_handle.idx);
+    const handle_cam_1: data_handles.HandleCamera = try controller.add_camera("camera1");
+    try std.testing.expectEqual(0, handle_cam_1.idx);
 
     // second valid camera.
-    const cam_2_handle: data_handles.HandleCamera = try controller.add_camera("camera2");
-    try std.testing.expectEqual(1, cam_2_handle.idx);
-    const cam_2_name_handle = controller.array_camera.items[cam_2_handle.idx].?.handle_name;
-    try std.testing.expectEqual("camera2", controller.array_name.items[cam_2_name_handle.idx]);
+    const handle_cam_2: data_handles.HandleCamera = try controller.add_camera("camera2");
+    try std.testing.expectEqual(1, handle_cam_2.idx);
+    const handle_cam_2_name = controller.array_camera.items[handle_cam_2.idx].?.handle_name;
+    try std.testing.expectEqual("camera2", controller.array_name.items[handle_cam_2_name.idx]);
 
     // name conflict
-    try std.testing.expectError(SceneError.NameAlreadyTaken, controller.add_camera("camera2"));
+    try std.testing.expectError(ErrorControllerObject.NameAlreadyTaken, controller.add_camera("camera2"));
 
-    // get camera
-    const handle_cam = data_handles.HandleCamera{ .idx = 1 };
-    const cam_pointer = try controller.get_camera_pointer(handle_cam);
-    try std.testing.expectEqual(10, cam_pointer.*.focal_length);
+    const ptr_cam_1 = try controller.get_camera_pointer(handle_cam_1);
+    ptr_cam_1.*.focal_length = 38;
+    try std.testing.expectEqual(38, ptr_cam_1.*.focal_length);
 
     controller.deinit();
 }
 
-test "co_add_sphere" {
+test "u_add_get_sphere" {
     var controller = ControllerObject.init();
-    const sphere_1_handle: data_handles.HandleShape = try controller.add_shape(
+    const handle_sphere_1: data_handles.HandleShape = try controller.add_shape(
         "sphere1",
         Shape.Tag.ImplicitSphere,
     );
+    const ptr_sphere_1 = try controller.get_shape_pointer(handle_sphere_1);
+    ptr_sphere_1.data.ImplicitSphere.radius = 16;
 
-    try std.testing.expectEqual(0, sphere_1_handle.idx);
+    try std.testing.expectEqual(0, handle_sphere_1.idx);
+
     try std.testing.expectEqual(
-        10,
-        controller.array_shape.items[sphere_1_handle.idx].?.data.ImplicitSphere.radius,
+        16,
+        controller.array_shape.items[handle_sphere_1.idx].?.data.ImplicitSphere.radius,
     );
 }
 
-test "co_add_plane" {
+test "u_add_get_plane" {
     var controller = ControllerObject.init();
-    const plane_1_handle: data_handles.HandleShape = try controller.add_shape(
+    const handle_plane_1: data_handles.HandleShape = try controller.add_shape(
         "plane",
         Shape.Tag.ImplicitPlane,
     );
+    const ptr_plane_1 = try controller.get_shape_pointer(handle_plane_1);
+    ptr_plane_1.data.ImplicitPlane.normal.y = 2;
 
-    try std.testing.expectEqual(0, plane_1_handle.idx);
+    try std.testing.expectEqual(0, handle_plane_1.idx);
     try std.testing.expectEqual(
-        1,
-        controller.array_shape.items[plane_1_handle.idx].?.data.ImplicitPlane.normal.y,
+        2,
+        controller.array_shape.items[handle_plane_1.idx].?.data.ImplicitPlane.normal.y,
     );
+}
+
+test "u_set_position" {
+    var controller = ControllerObject.init();
+    defer controller.deinit();
+    const hdl_sphere1: data_handles.HandleShape = try controller.add_shape(
+        "sphere1",
+        Shape.Tag.ImplicitSphere,
+    );
+    const ptr_sphere1 = try controller.get_shape_pointer(hdl_sphere1);
+    const ptr_tmatrix = try controller.get_tmatrix_pointer(ptr_sphere1.handle_tmatrix);
+
+    try controller.set_position_from_tmatrix_handle(
+        ptr_sphere1.*.handle_tmatrix,
+        Vec3f32{ .x = -5, .y = -5, .z = 0 },
+    );
+    const position = ptr_tmatrix.get_position();
+    try std.testing.expectEqual(-5, position.x);
+    try std.testing.expectEqual(-5, position.y);
+    try std.testing.expectEqual(0, position.z);
 }

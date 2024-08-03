@@ -48,6 +48,8 @@ pub fn Matrix(comptime T: type) type {
     };
 }
 
+pub const Matrixf32 = Matrix(f32);
+
 pub const BoudingRectangleu16 = struct {
     x_min: u16 = undefined,
     x_max: u16 = undefined,
