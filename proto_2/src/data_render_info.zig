@@ -1,5 +1,6 @@
 const std = @import("std");
 const data_handles = @import("data_handle.zig");
+const definitions = @import("definitions.zig");
 const data_render_settings = @import("data_render_settings.zig");
 const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
@@ -42,13 +43,18 @@ pub const RenderInfo = struct {
         const image_width: u16 = scene_render_settings.width;
         const image_height: u16 = scene_render_settings.height;
 
-        const ptr_cam_entity: *const ControllereObject.Camera = try controller_object.get_camera_pointer(camera_handle);
+        const ptr_cam_entity: *const ControllereObject.CameraEntity = try controller_object.get_camera_pointer(camera_handle);
         const ptr_cam_tmatrix: *const maths_tmat.TMatrix = try controller_object.get_tmatrix_pointer(
             ptr_cam_entity.*.handle_tmatrix,
         );
 
-        const focal_length: f32 = ptr_cam_entity.*.focal_length;
-        const field_of_view: f32 = ptr_cam_entity.*.field_of_view;
+        switch (ptr_cam_entity.data) {
+            definitions.Camera.Perspective => {},
+            inline else => unreachable,
+        }
+
+        const focal_length: f32 = ptr_cam_entity.*.data.Perspective.focal_length;
+        const field_of_view: f32 = ptr_cam_entity.*.data.Perspective.field_of_view;
 
         const tile_x_y: maths_vec.Vec2(u16) = utils_tile_rendering.calculate_tile_number(
             image_width,
@@ -58,7 +64,7 @@ pub const RenderInfo = struct {
 
         const cam_direction: maths_vec.Vec3f32 = utils_camera.get_camera_absolute_direction(
             ptr_cam_tmatrix.*,
-            ControllereObject.Camera.CAMERA_DIRECTION,
+            ControllereObject.CameraEntity.CAMERA_DIRECTION,
         );
 
         const cam_focal_plane_center: maths_vec.Vec3f32 = utils_camera.get_camera_focal_plane_center(

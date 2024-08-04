@@ -8,12 +8,8 @@ const SpawnConfig = Thread.SpawnConfig;
 const constants = @import("constants.zig");
 
 const definitions = @import("definitions.zig");
-const Material = definitions.Material;
-const ShapeEnum = definitions.ShapeEnum;
-const Shape = definitions.Shape;
+const AovStandardEnum = definitions.AovStandardEnum;
 
-const utils_zig = @import("utils_zig.zig");
-const utils_camera = @import("utils_camera.zig");
 const utils_logging = @import("utils_logging.zig");
 const utils_tile_rendering = @import("utils_tile_rendering.zig");
 
@@ -23,15 +19,7 @@ const data_render_info = @import("data_render_info.zig");
 const data_render_settings = @import("data_render_settings.zig");
 const data_pixel_payload = @import("data_pixel_payload.zig");
 
-const maths_vec = @import("maths_vec.zig");
-const maths_mat = @import("maths_mat.zig");
-const maths_tmat = @import("maths_tmat.zig");
-
-const Vec3f32 = maths_vec.Vec3f32;
-const TMatrix = maths_tmat.TMatrix;
-
 const ControllereScene = @import("controller_scene.zig");
-const ControllereObject = @import("controller_object.zig");
 const ControllerAov = @import("controller_aov.zig");
 const ControllerImg = @import("controller_img.zig");
 
@@ -45,7 +33,7 @@ controller_img: ControllerImg,
 
 render_info: RenderInfo,
 render_shared_data: RenderingSharedData,
-aov_to_image_layer: std.AutoHashMap(ControllerAov.AovStandard, usize),
+aov_to_image_layer: std.AutoHashMap(AovStandardEnum, usize),
 
 pub fn init(controller_scene: *ControllereScene) Renderer {
     return .{
@@ -56,7 +44,7 @@ pub fn init(controller_scene: *ControllereScene) Renderer {
         ),
         .render_shared_data = undefined, // defined at "render"
         .render_info = undefined, // defined at "render"
-        .aov_to_image_layer = std.AutoHashMap(ControllerAov.AovStandard, usize).init(gpa),
+        .aov_to_image_layer = std.AutoHashMap(AovStandardEnum, usize).init(gpa),
     };
     // missing: add aov. aov model?
 }
@@ -231,8 +219,8 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, pixel_payload
     _ = y;
     _ = self;
 
-    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Beauty, data_color.COLOR_RED);
-    pixel_payload.add_sample_to_aov(ControllerAov.AovStandard.Normal, data_color.COLOR_GREY);
+    pixel_payload.add_sample_to_aov(AovStandardEnum.Beauty, data_color.COLOR_RED);
+    pixel_payload.add_sample_to_aov(AovStandardEnum.Normal, data_color.COLOR_GREY);
 }
 
 // -- Render Type : Tile -----------------------------------------------------
@@ -306,72 +294,4 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
             return;
         }
     }
-}
-
-// -- Tests ------------------------------------------------------------------
-
-test "i_prepare_render" {
-    var controller_scene = try ControllereScene.init();
-    defer controller_scene.deinit();
-
-    var controller_object = &controller_scene.controller_object;
-    var controller_aov = &controller_scene.controller_aov;
-    var controller_mat = &controller_scene.controller_material;
-
-    const handle_mat_default = try controller_mat.add_material(
-        "default",
-        Material{ .Lambertian = .{} },
-    );
-    _ = try controller_object.new_add_shape(
-        "sphere_1",
-        ShapeEnum.ImplicitSphere,
-        Shape{ .ImplicitSphere = .{ .radius = 45 } },
-        TMatrix.create_at_position(Vec3f32{ .x = 1, .y = 2, .z = 3 }),
-        handle_mat_default,
-    );
-
-    _ = try controller_object.new_add_shape(
-        "plane_1",
-        ShapeEnum.ImplicitSphere,
-        Shape{ .ImplicitPlane = .{ .normal = Vec3f32.create_y() } },
-        TMatrix.create_at_position(Vec3f32{ .x = 1, .y = 2, .z = 3 }),
-        handle_mat_default,
-    );
-
-    // ....
-
-    _ = try controller_object.add_env("sky", ControllereObject.Environment.Tag.SkyDome);
-    const handle_cam: data_handles.HandleCamera = try controller_object.add_camera("camera1");
-    _ = try controller_object.add_shape("sphere1", ShapeEnum.ImplicitSphere);
-    _ = try controller_object.add_shape("plane", ShapeEnum.ImplicitPlane);
-    // const handle_plane = try controller_object.add_shape("plane", ControllereObject.Shape.Tag.ImplicitPlane);
-
-    // try controller_object.set_position_from_object_handle(
-    //     data_handles.HandleObjectWithTMatrixEnum{ .HandleShape = handle_sphere },
-    //     maths_vec.Vec3f32{ .x = 0, .y = 5, .z = 0 },
-    // );
-
-    // try controller_object.set_position_from_object_handle(
-    //     data_handles.HandleObjectWithTMatrixEnum{ .HandleShape = handle_plane },
-    //     maths_vec.Vec3f32{ .x = 0, .y = 5, .z = 0 },
-    // );
-    //
-    // try controller_object.set_position_from_object_handle(
-    //     data_handles.HandleObjectWithTMatrixEnum{ .HandleCamera = handle_cam },
-    //     maths_vec.Vec3f32{ .x = -10, .y = 3, .z = 0 },
-    // );
-
-    controller_scene.render_settings.width = 1920;
-    controller_scene.render_settings.height = 1080;
-    controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 2;
-
-    try controller_aov.add_aov_standard(ControllerAov.AovStandard.Beauty);
-    try controller_aov.add_aov_standard(ControllerAov.AovStandard.Alpha);
-    try controller_aov.add_aov_standard(ControllerAov.AovStandard.Normal);
-
-    var renderer = Renderer.init(&controller_scene);
-    defer renderer.deinit();
-
-    try renderer.render(handle_cam, "tests", "test_render_image");
 }

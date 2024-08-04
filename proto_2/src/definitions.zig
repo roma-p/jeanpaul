@@ -1,4 +1,5 @@
 const maths_vec = @import("maths_vec.zig");
+const data_handle = @import("data_handle.zig");
 const data_color = @import("data_color.zig");
 
 const Vec3f32 = maths_vec.Vec3f32;
@@ -6,11 +7,21 @@ const Color = data_color.Color;
 
 pub const MaterialEnum = enum {
     Lambertian,
+    Phong,
 };
 
 pub const ShapeEnum = enum {
     ImplicitSphere,
     ImplicitPlane,
+};
+
+pub const CameraEnum = enum {
+    Perspective,
+    Orthographic,
+};
+
+pub const EnvironmentEnum = enum {
+    SkyDome,
 };
 
 pub const AovStandardEnum = enum {
@@ -26,6 +37,7 @@ pub const Material = union(MaterialEnum) {
         base: f32 = 0.7,
         base_color: Color = data_color.COLOR_GREY,
     },
+    Phong: struct {},
 };
 
 pub const Shape = union(ShapeEnum) {
@@ -37,5 +49,16 @@ pub const Shape = union(ShapeEnum) {
     },
 };
 
-// IDEA of api:
-// add_shape("lul", Shape {.ImplicitSphere{}}, handleTMat or null, TMAT or null.
+pub const Camera = union(CameraEnum) {
+    Perspective: struct {
+        focal_length: f32 = 10,
+        field_of_view: f32 = 60,
+    },
+    Orthographic: struct {},
+};
+
+pub const Environment = union(EnvironmentEnum) {
+    SkyDome: struct {
+        handle_material: data_handle.HandleMaterial,
+    },
+};

@@ -2,6 +2,9 @@ const std = @import("std");
 const mem = std.mem;
 const gpa = std.heap.page_allocator;
 
+const definitions = @import("definitions.zig");
+const AovStandard = definitions.AovStandardEnum;
+
 pub const ControllerAov = @This();
 
 array_aov_standard: std.ArrayList(AovStandard),
@@ -15,13 +18,6 @@ pub fn init() ControllerAov {
 pub fn deinit(self: *ControllerAov) void {
     self.array_aov_standard.deinit();
 }
-
-pub const AovStandard = enum {
-    Beauty,
-    Alpha,
-    Depth,
-    Normal,
-};
 
 pub fn add_aov_standard(self: *ControllerAov, aov_standard: AovStandard) !void {
     for (self.array_aov_standard.items) |i| {

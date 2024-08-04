@@ -9,4 +9,5 @@ comptime {
     _ = @import("controller_img.zig");
     _ = @import("controller_scene.zig");
     _ = @import("renderer.zig");
+    _ = @import("tests_integration.zig");
 }
