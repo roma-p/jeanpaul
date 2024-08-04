@@ -2,6 +2,10 @@ const std = @import("std");
 const mem = std.mem;
 const gpa = std.heap.page_allocator;
 
+const definitions = @import("definitions.zig");
+const ShapeEnum = definitions.ShapeEnum;
+const Shape = definitions.Shape;
+
 const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
 
@@ -19,7 +23,7 @@ const HANDLE_DEFAULT_MATERIAL = data_handles.HandleMaterial{ .idx = 0 };
 
 // "entities"
 array_camera: std.ArrayList(?Camera),
-array_shape: std.ArrayList(?Shape),
+array_shape: std.ArrayList(?ShapeEntity),
 array_env: std.ArrayList(?Environment),
 
 // "components"
@@ -31,7 +35,7 @@ pub fn init() ControllerObject {
         .array_name = std.ArrayList(?[]const u8).init(gpa),
         .array_tmatrix = std.ArrayList(?TMatrix).init(gpa),
         .array_camera = std.ArrayList(?Camera).init(gpa),
-        .array_shape = std.ArrayList(?Shape).init(gpa),
+        .array_shape = std.ArrayList(?ShapeEntity).init(gpa),
         .array_env = std.ArrayList(?Environment).init(gpa),
     };
 }
@@ -56,29 +60,14 @@ pub const Camera = struct {
     pub const Tag = enum { CameraPersp };
 };
 
-pub const Shape = struct {
-    tag: Tag,
-    data: Data,
+pub const ShapeEntity = struct {
+    tag: ShapeEnum,
+    data: Shape,
     handle_name: data_handles.HandleObjectName,
     handle_material: data_handles.HandleMaterial,
     handle_tmatrix: data_handles.HandleTMatrix,
 
     const IMPLICIT_PLANE_DIRECTION = Vec3f32.create_y();
-
-    pub const Tag = enum {
-        ImplicitSphere,
-        ImplicitPlane,
-    };
-
-    // TODO: PUT THIS IN "MODEL DEFINITION"...
-    const Data = union(Tag) {
-        ImplicitSphere: struct {
-            radius: f32 = 10,
-        },
-        ImplicitPlane: struct {
-            normal: Vec3f32 = Vec3f32.create_y(),
-        },
-    };
 };
 
 pub const Environment = struct {
@@ -97,7 +86,7 @@ pub const Environment = struct {
 
 pub const ObjectPointerEnum = union(data_handles.HandleObjectAllEnum) {
     HandleCamera: *const Camera,
-    HandleShape: *const Shape,
+    HandleShape: *const ShapeEntity,
     HandleEnv: *const Environment,
     HandleObjectName: *const []u8,
     HandleTMatrix: *const TMatrix,
@@ -125,10 +114,35 @@ pub fn add_camera(
     return handle_camera;
 }
 
+pub fn new_add_shape(
+    self: *ControllerObject,
+    name: []const u8,
+    tag: ShapeEnum, // TODO: remove this param?
+    shape: Shape,
+    tmatrix: TMatrix,
+    handle_mat: data_handles.HandleMaterial,
+) !data_handles.HandleShape {
+    const handle_name: data_handles.HandleObjectName = try self._add_name(name);
+    errdefer self._remove_name(handle_name);
+
+    const handle_tmatrix: data_handles.HandleTMatrix = try self._new_add_tmatrix(tmatrix);
+    errdefer self._remove_tmatrix(handle_tmatrix);
+
+    const handle_shape = data_handles.HandleShape{ .idx = self.array_shape.items.len };
+
+    try self.array_shape.append(ShapeEntity{
+        .handle_name = handle_name,
+        .handle_tmatrix = handle_tmatrix,
+        .handle_material = handle_mat,
+        .tag = tag,
+        .data = shape,
+    });
+    return handle_shape;
+}
 pub fn add_shape(
     self: *ControllerObject,
     name: []const u8,
-    tag: Shape.Tag,
+    tag: ShapeEnum,
 ) !data_handles.HandleShape {
     const handle_name: data_handles.HandleObjectName = try self._add_name(name);
     errdefer self._remove_name(handle_name);
@@ -138,14 +152,14 @@ pub fn add_shape(
 
     const handle_shape = data_handles.HandleShape{ .idx = self.array_shape.items.len };
 
-    try self.array_shape.append(Shape{
+    try self.array_shape.append(ShapeEntity{
         .handle_name = handle_name,
         .handle_tmatrix = handle_tmatrix,
         .handle_material = HANDLE_DEFAULT_MATERIAL,
         .tag = tag,
         .data = switch (tag) {
-            Shape.Tag.ImplicitSphere => Shape.Data{ .ImplicitSphere = .{} },
-            Shape.Tag.ImplicitPlane => Shape.Data{ .ImplicitPlane = .{} },
+            ShapeEnum.ImplicitSphere => Shape{ .ImplicitSphere = .{} },
+            ShapeEnum.ImplicitPlane => Shape{ .ImplicitPlane = .{} },
         },
     });
     return handle_shape;
@@ -192,7 +206,7 @@ pub fn get_camera_pointer(
 pub fn get_shape_pointer(
     self: *ControllerObject,
     handle: data_handles.HandleShape,
-) ErrorControllerObject!*Shape {
+) ErrorControllerObject!*ShapeEntity {
     if (handle.idx > self.array_shape.items.len) {
         return ErrorControllerObject.InvalidHandle;
     }
@@ -274,9 +288,16 @@ fn _remove_name(self: *ControllerObject, handle: data_handles.HandleObjectName) 
     }
 }
 
+// TODO: remove me
 fn _add_tmatrix(self: *ControllerObject) !data_handles.HandleTMatrix {
     const idx: usize = self.array_tmatrix.items.len;
     try self.array_tmatrix.append(TMatrix.create_identity());
+    return data_handles.HandleTMatrix{ .idx = idx };
+}
+
+fn _new_add_tmatrix(self: *ControllerObject, tmatrix: TMatrix) !data_handles.HandleTMatrix {
+    const idx: usize = self.array_tmatrix.items.len;
+    try self.array_tmatrix.append(tmatrix);
     return data_handles.HandleTMatrix{ .idx = idx };
 }
 
@@ -318,7 +339,7 @@ test "u_add_get_sphere" {
     var controller = ControllerObject.init();
     const handle_sphere_1: data_handles.HandleShape = try controller.add_shape(
         "sphere1",
-        Shape.Tag.ImplicitSphere,
+        ShapeEnum.ImplicitSphere,
     );
     const ptr_sphere_1 = try controller.get_shape_pointer(handle_sphere_1);
     ptr_sphere_1.data.ImplicitSphere.radius = 16;
@@ -335,7 +356,7 @@ test "u_add_get_plane" {
     var controller = ControllerObject.init();
     const handle_plane_1: data_handles.HandleShape = try controller.add_shape(
         "plane",
-        Shape.Tag.ImplicitPlane,
+        ShapeEnum.ImplicitPlane,
     );
     const ptr_plane_1 = try controller.get_shape_pointer(handle_plane_1);
     ptr_plane_1.data.ImplicitPlane.normal.y = 2;
@@ -352,7 +373,7 @@ test "u_set_position" {
     defer controller.deinit();
     const hdl_sphere1: data_handles.HandleShape = try controller.add_shape(
         "sphere1",
-        Shape.Tag.ImplicitSphere,
+        ShapeEnum.ImplicitSphere,
     );
     const ptr_sphere1 = try controller.get_shape_pointer(hdl_sphere1);
     const ptr_tmatrix = try controller.get_tmatrix_pointer(ptr_sphere1.handle_tmatrix);

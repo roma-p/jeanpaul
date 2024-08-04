@@ -17,14 +17,12 @@ controller_aov: ControllerAov,
 render_settings: RenderSettings,
 
 pub fn init() !ControllerScene {
-    var ret = ControllerScene{
+    return ControllerScene{
         .controller_material = ControllerMaterial.init(),
         .controller_object = ControllerObject.init(),
         .controller_aov = ControllerAov.init(),
         .render_settings = RenderSettings.create_with_default_value(),
     };
-    _ = try ret.controller_material.add_material("default");
-    return ret;
 }
 
 pub fn deinit(self: *ControllerScene) void {

@@ -2,6 +2,9 @@ const std = @import("std");
 const mem = std.mem;
 const gpa = std.heap.page_allocator;
 
+const definitions = @import("definitions.zig");
+const Material = definitions.Material;
+
 const data_color = @import("data_color.zig");
 const data_handles = @import("data_handle.zig");
 
@@ -34,14 +37,10 @@ pub fn deinit(self: *ControllerMaterial) void {
     self.array_material.deinit();
 }
 
-pub const Material = struct {
-    base: f32 = 0.7,
-    base_color: Color = data_color.COLOR_GREY,
-};
-
 pub fn add_material(
     self: *ControllerMaterial,
     name: []const u8,
+    material: Material,
 ) !data_handles.HandleMaterial {
     for (self.array_name.items) |v| {
         if (v == null) continue;
@@ -51,7 +50,7 @@ pub fn add_material(
     }
     const idx = self.array_material.items.len;
     try self.array_name.append(name);
-    try self.array_material.append(Material{});
+    try self.array_material.append(material);
     return data_handles.HandleMaterial{ .idx = idx };
 }
 

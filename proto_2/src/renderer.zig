@@ -7,6 +7,11 @@ const SpawnConfig = Thread.SpawnConfig;
 
 const constants = @import("constants.zig");
 
+const definitions = @import("definitions.zig");
+const Material = definitions.Material;
+const ShapeEnum = definitions.ShapeEnum;
+const Shape = definitions.Shape;
+
 const utils_zig = @import("utils_zig.zig");
 const utils_camera = @import("utils_camera.zig");
 const utils_logging = @import("utils_logging.zig");
@@ -21,6 +26,9 @@ const data_pixel_payload = @import("data_pixel_payload.zig");
 const maths_vec = @import("maths_vec.zig");
 const maths_mat = @import("maths_mat.zig");
 const maths_tmat = @import("maths_tmat.zig");
+
+const Vec3f32 = maths_vec.Vec3f32;
+const TMatrix = maths_tmat.TMatrix;
 
 const ControllereScene = @import("controller_scene.zig");
 const ControllereObject = @import("controller_object.zig");
@@ -308,14 +316,34 @@ test "i_prepare_render" {
 
     var controller_object = &controller_scene.controller_object;
     var controller_aov = &controller_scene.controller_aov;
-    // var controller_mat = &controller_scene.controller_material;
+    var controller_mat = &controller_scene.controller_material;
+
+    const handle_mat_default = try controller_mat.add_material(
+        "default",
+        Material{ .Lambertian = .{} },
+    );
+    _ = try controller_object.new_add_shape(
+        "sphere_1",
+        ShapeEnum.ImplicitSphere,
+        Shape{ .ImplicitSphere = .{ .radius = 45 } },
+        TMatrix.create_at_position(Vec3f32{ .x = 1, .y = 2, .z = 3 }),
+        handle_mat_default,
+    );
+
+    _ = try controller_object.new_add_shape(
+        "plane_1",
+        ShapeEnum.ImplicitSphere,
+        Shape{ .ImplicitPlane = .{ .normal = Vec3f32.create_y() } },
+        TMatrix.create_at_position(Vec3f32{ .x = 1, .y = 2, .z = 3 }),
+        handle_mat_default,
+    );
 
     // ....
 
     _ = try controller_object.add_env("sky", ControllereObject.Environment.Tag.SkyDome);
     const handle_cam: data_handles.HandleCamera = try controller_object.add_camera("camera1");
-    _ = try controller_object.add_shape("sphere1", ControllereObject.Shape.Tag.ImplicitSphere);
-    _ = try controller_object.add_shape("plane", ControllereObject.Shape.Tag.ImplicitPlane);
+    _ = try controller_object.add_shape("sphere1", ShapeEnum.ImplicitSphere);
+    _ = try controller_object.add_shape("plane", ShapeEnum.ImplicitPlane);
     // const handle_plane = try controller_object.add_shape("plane", ControllereObject.Shape.Tag.ImplicitPlane);
 
     // try controller_object.set_position_from_object_handle(
