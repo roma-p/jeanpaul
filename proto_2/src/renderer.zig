@@ -1,5 +1,6 @@
 const std = @import("std");
 const gpa = std.heap.page_allocator;
+const RndGen = std.rand.DefaultPrng;
 
 const Thread = std.Thread;
 const Mutex = Thread.Mutex;
@@ -10,7 +11,9 @@ const constants = @import("constants.zig");
 const definitions = @import("definitions.zig");
 const AovStandardEnum = definitions.AovStandardEnum;
 
+const utils_zig = @import("utils_zig.zig");
 const utils_logging = @import("utils_logging.zig");
+const utils_camera = @import("utils_camera.zig");
 const utils_tile_rendering = @import("utils_tile_rendering.zig");
 
 const data_handles = @import("data_handle.zig");
@@ -31,9 +34,13 @@ const PixelPayload = data_pixel_payload.PixelPayload;
 controller_scene: *ControllereScene,
 controller_img: ControllerImg,
 
-render_info: RenderInfo,
-render_shared_data: RenderingSharedData,
 aov_to_image_layer: std.AutoHashMap(AovStandardEnum, usize),
+
+render_info: RenderInfo,
+render_shared_data: RenderDataShared,
+
+array_thread: std.ArrayList(Thread),
+array_render_data_per_thread: std.ArrayList(RenderDataPerThread),
 
 pub fn init(controller_scene: *ControllereScene) Renderer {
     return .{
@@ -45,16 +52,25 @@ pub fn init(controller_scene: *ControllereScene) Renderer {
         .render_shared_data = undefined, // defined at "render"
         .render_info = undefined, // defined at "render"
         .aov_to_image_layer = std.AutoHashMap(AovStandardEnum, usize).init(gpa),
+        .array_render_data_per_thread = std.ArrayList(RenderDataPerThread).init(gpa),
+        .array_thread = std.ArrayList(Thread).init(gpa),
     };
-    // missing: add aov. aov model?
+    // TODO: missing: add aov. aov model?
 }
 
 pub fn deinit(self: *Renderer) void {
     self.controller_img.deinit();
     self.aov_to_image_layer.deinit();
+    self.array_render_data_per_thread.deinit();
+    self.array_thread.deinit();
 }
 
-const RenderingSharedData = struct {
+const RenderDataPerThread = struct {
+    rnd: RndGen,
+    pixel_payload: PixelPayload,
+};
+
+const RenderDataShared = struct {
     mutex: Mutex,
 
     pixel_done_nb: u32,
@@ -66,7 +82,7 @@ const RenderingSharedData = struct {
     const DELAY_BETWEEN_PERCENT_DISPLAY_S = 2;
 
     const DataPerRenderType = union(data_render_settings.RenderType) {
-        SingleThread: struct {},
+        Pixel: struct {},
         Scanline: struct {},
         Tile: struct {
             next_tile_to_render: ?u16,
@@ -91,7 +107,7 @@ const RenderingSharedData = struct {
             .last_percent_display_time = 0,
             .pixel_total_nb = px_number_ret.@"0",
             .data_per_render_type = switch (render_info.data_per_render_type) {
-                data_render_settings.RenderType.Tile => RenderingSharedData.DataPerRenderType{
+                data_render_settings.RenderType.Tile => RenderDataShared.DataPerRenderType{
                     .Tile = .{
                         .next_tile_to_render = 0,
                         .tile_already_rendered = 0,
@@ -99,7 +115,7 @@ const RenderingSharedData = struct {
                     },
                 },
                 data_render_settings.RenderType.Scanline => unreachable,
-                data_render_settings.RenderType.SingleThread => unreachable,
+                data_render_settings.RenderType.Pixel => unreachable,
             },
         };
     }
@@ -165,24 +181,21 @@ pub fn render(
     dir: []const u8,
     img_name: []const u8,
 ) !void {
-    try self.prepare_controller_img();
+    const thread_nbr = constants.CORE_NUMBER;
+
+    try self.prepare_render(camera_handle, thread_nbr);
+    defer self.dispose_render();
+
     const time_start = std.time.timestamp();
 
-    self.render_info = try RenderInfo.create_from_scene(self.controller_scene, camera_handle);
-
     switch (self.render_info.render_type) {
-        data_render_settings.RenderType.Tile => try render_tile(
-            self,
-            camera_handle,
-            self.render_info,
-        ),
+        data_render_settings.RenderType.Tile => try render_tile(self),
         data_render_settings.RenderType.Scanline => unreachable,
-        data_render_settings.RenderType.SingleThread => unreachable,
+        data_render_settings.RenderType.Pixel => unreachable,
     }
 
     const time_end = std.time.timestamp();
-    const time_elapsed = time_end - time_start;
-    const time_struct = utils_logging.format_time(time_elapsed);
+    const time_struct = utils_logging.format_time(time_end - time_start);
     std.debug.print(
         "Rendered done in {d}h {d}m {d}s.\n",
         .{ time_struct.hour, time_struct.min, time_struct.sec },
@@ -191,21 +204,57 @@ pub fn render(
     try self.controller_img.write_ppm(dir, img_name);
 }
 
-fn prepare_controller_img(self: *Renderer) !void {
+fn prepare_render(self: *Renderer, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !void {
+    // 1. prepare controller img.
     for (self.controller_scene.controller_aov.array_aov_standard.items) |aov| {
         const aov_name = @tagName(aov);
         const img_layer_idx = try self.controller_img.register_image_layer(aov_name);
         try self.aov_to_image_layer.put(aov, img_layer_idx);
     }
+
+    // 2. initialize render info.
+    self.render_info = try RenderInfo.create_from_scene(
+        self.controller_scene,
+        camera_handle,
+        thread_nbr,
+    );
+
+    // 3. generate render info shared.
+    self.render_shared_data = RenderDataShared.init(self.render_info);
+
+    // 4. generate render info per thread.
+    var i: usize = 0;
+    while (i < thread_nbr) : (i += 1) {
+        const render_data_per_thread = RenderDataPerThread{
+            .pixel_payload = try PixelPayload.init(
+                &self.controller_scene.controller_aov,
+                self.render_info.samples_invert,
+            ),
+            .rnd = RndGen.init(i),
+        };
+        try self.array_render_data_per_thread.append(render_data_per_thread);
+    }
+}
+
+fn dispose_render(self: *Renderer) void {
+    for (self.array_render_data_per_thread.items) |*data| {
+        data.pixel_payload.deinit();
+    }
+    self.array_render_data_per_thread.clearAndFree();
+    self.render_info = undefined;
+    self.render_shared_data = undefined;
+    self.array_render_data_per_thread.clearAndFree();
 }
 
 // -- Render entry point -----------------------------------------------------
 
-fn render_single_px(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) !void {
+fn render_single_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
+    var pixel_payload = self.array_render_data_per_thread.items[thread_idx].pixel_payload;
     pixel_payload.reset();
+
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
-        self.render_single_px_single_sample(x, y, pixel_payload);
+        self.render_single_px_single_sample(x, y, thread_idx);
     }
     var it = pixel_payload.aov_to_color.iterator();
     while (it.next()) |item| {
@@ -214,56 +263,51 @@ fn render_single_px(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayloa
     }
 }
 
-fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, pixel_payload: *PixelPayload) void {
-    _ = x;
-    _ = y;
-    _ = self;
+fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) void {
+    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
 
-    pixel_payload.add_sample_to_aov(AovStandardEnum.Beauty, data_color.COLOR_RED);
-    pixel_payload.add_sample_to_aov(AovStandardEnum.Normal, data_color.COLOR_GREY);
+    const x_f32 = utils_zig.cast_u16_to_f32(x);
+    const y_f32 = utils_zig.cast_u16_to_f32(y);
+
+    const render_info = self.render_info;
+
+    _ = utils_camera.get_ray_direction_from_focal_plane(
+        render_info.camera_position,
+        render_info.focal_plane_center,
+        render_info.image_width_f32,
+        render_info.image_height_f32,
+        render_info.pixel_size,
+        x_f32,
+        y_f32,
+        &render_data_per_thread.rnd,
+    );
+
+    render_data_per_thread.pixel_payload.add_sample_to_aov(AovStandardEnum.Beauty, data_color.COLOR_RED);
+    render_data_per_thread.pixel_payload.add_sample_to_aov(AovStandardEnum.Normal, data_color.COLOR_GREY);
 }
 
 // -- Render Type : Tile -----------------------------------------------------
 
-pub fn render_tile(
-    self: *Renderer,
-    camera_handle: data_handles.HandleCamera,
-    render_info: RenderInfo,
-) !void {
-    _ = camera_handle;
-    const thread_number = constants.CORE_NUMBER;
-
-    self.render_shared_data = RenderingSharedData.init(render_info);
-
-    var thread_array = std.ArrayList(std.Thread).init(gpa);
-    defer thread_array.deinit();
-
+pub fn render_tile(self: *Renderer) !void {
+    const thread_nbr = self.render_info.thread_nbr;
     var i: usize = 0;
-    while (i < thread_number) : (i += 1) {
-        try thread_array.append(try std.Thread.spawn(
+    while (i < thread_nbr) : (i += 1) {
+        try self.array_thread.append(try std.Thread.spawn(
             .{},
             render_tile_single_thread_func,
-            .{
-                self,
-                render_info,
-            },
+            .{ self, i },
         ));
     }
     i = 0;
-    while (i < thread_number) : (i += 1) {
-        thread_array.items[i].join();
+    while (i < thread_nbr) : (i += 1) {
+        self.array_thread.items[i].join();
     }
 }
 
-fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !void {
+fn render_tile_single_thread_func(self: *Renderer, thread_idx: usize) !void {
+    const render_info = self.render_info;
     var is_a_tile_finished_render = false;
     var pxl_rendered_nbr: u16 = 0;
-
-    var pixel_payload = try PixelPayload.init(
-        &self.controller_scene.controller_aov,
-        self.render_info.samples_invert,
-    );
-    defer pixel_payload.deinit();
 
     while (true) {
         const tile_to_render_idx = self.render_shared_data.get_next_tile_to_render(
@@ -286,7 +330,7 @@ fn render_tile_single_thread_func(self: *Renderer, render_info: RenderInfo) !voi
             while (_x <= tile_bounding_rectangle.x_max) : (_x += 1) {
                 _y = tile_bounding_rectangle.y_min;
                 while (_y <= tile_bounding_rectangle.y_max) : (_y += 1) {
-                    try self.render_single_px(_x, _y, &pixel_payload);
+                    try self.render_single_px(_x, _y, thread_idx);
                 }
             }
             is_a_tile_finished_render = true;

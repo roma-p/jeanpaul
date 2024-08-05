@@ -19,7 +19,7 @@ pub fn create_with_default_value() RenderSettings {
 }
 
 pub const RenderType = enum {
-    SingleThread,
+    Pixel,
     Scanline,
     Tile,
 };

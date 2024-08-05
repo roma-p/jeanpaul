@@ -32,3 +32,28 @@ pub fn get_pixel_size_on_focal_plane(
     const img_width_as_f32 = utils_zig.cast_u16_to_f32(img_width);
     return focal_plane_width / img_width_as_f32;
 }
+
+pub fn get_ray_direction_from_focal_plane(
+    camera_position: maths_vec.Vec3f32,
+    focal_plane_center: maths_vec.Vec3f32,
+    screen_width: f32,
+    screen_height: f32,
+    pixel_size: f32,
+    x: f32,
+    y: f32,
+    rnd: *std.rand.DefaultPrng,
+) maths_vec.Vec3f32 {
+    const rand_1 = (rnd.random().float(f32) * pixel_size) - pixel_size / 2;
+    const rand_2 = (rnd.random().float(f32) * pixel_size) - pixel_size / 2;
+
+    // + pixel_size / 2 -> hitting the middle of the pixel
+    const focal_plane_center_to_px_position = maths_vec.Vec3f32{
+        .x = (x - screen_width / 2) * pixel_size + pixel_size / 2 + rand_1,
+        .y = (y - screen_height / 2) * pixel_size + pixel_size / 2 + rand_2,
+        .z = 0,
+    };
+
+    const screen_px_focal_plane_position = focal_plane_center.sum_vector(focal_plane_center_to_px_position);
+    const ray_direction = screen_px_focal_plane_position.substract_vector(camera_position);
+    return ray_direction;
+}

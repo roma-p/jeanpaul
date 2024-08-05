@@ -6,6 +6,7 @@ const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
 const utils_tile_rendering = @import("utils_tile_rendering.zig");
 const utils_camera = @import("utils_camera.zig");
+const utils_zig = @import("utils_zig.zig");
 const ControllereScene = @import("controller_scene.zig");
 const ControllereObject = @import("controller_object.zig");
 
@@ -14,6 +15,9 @@ pub const RenderInfo = struct {
 
     image_width: u16,
     image_height: u16,
+
+    image_width_f32: f32,
+    image_height_f32: f32,
 
     samples: u16,
     bounces: u16,
@@ -25,8 +29,13 @@ pub const RenderInfo = struct {
     samples_nbr: u16,
     samples_invert: f32,
 
+    camera_handle: data_handles.HandleCamera,
+    camera_position: maths_vec.Vec3f32,
+
+    thread_nbr: usize,
+
     pub const DataPerRenderType = union(data_render_settings.RenderType) {
-        SingleThread: struct {},
+        Pixel: struct {},
         Scanline: struct {},
         Tile: struct {
             tile_size: u16,
@@ -36,12 +45,15 @@ pub const RenderInfo = struct {
         },
     };
 
-    pub fn create_from_scene(controller_scene: *ControllereScene, camera_handle: data_handles.HandleCamera) !RenderInfo {
+    pub fn create_from_scene(controller_scene: *ControllereScene, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !RenderInfo {
         var controller_object = controller_scene.controller_object;
         const scene_render_settings = controller_scene.render_settings;
 
         const image_width: u16 = scene_render_settings.width;
         const image_height: u16 = scene_render_settings.height;
+
+        const image_width_f32: f32 = utils_zig.cast_u16_to_f32(image_width);
+        const image_height_f32: f32 = utils_zig.cast_u16_to_f32(image_height);
 
         const ptr_cam_entity: *const ControllereObject.CameraEntity = try controller_object.get_camera_pointer(camera_handle);
         const ptr_cam_tmatrix: *const maths_tmat.TMatrix = try controller_object.get_tmatrix_pointer(
@@ -83,16 +95,23 @@ pub const RenderInfo = struct {
         const sample_nbr_as_f32: f32 = @floatFromInt(sample_nbr);
         const invert_sample_nbr: f32 = 1 / sample_nbr_as_f32;
 
+        const camera_position = ptr_cam_tmatrix.*.get_position();
+
         return .{
             .pixel_size = pixel_size,
             .image_width = image_width,
             .image_height = image_height,
+            .image_width_f32 = image_width_f32,
+            .image_height_f32 = image_height_f32,
             .render_type = scene_render_settings.render_type,
             .samples = scene_render_settings.samples,
             .samples_nbr = sample_nbr,
             .samples_invert = invert_sample_nbr,
             .bounces = scene_render_settings.bounces,
             .focal_plane_center = cam_focal_plane_center,
+            .camera_handle = camera_handle,
+            .camera_position = camera_position,
+            .thread_nbr = thread_nbr,
             .data_per_render_type = switch (scene_render_settings.render_type) {
                 data_render_settings.RenderType.Tile => RenderInfo.DataPerRenderType{
                     .Tile = .{
@@ -103,7 +122,7 @@ pub const RenderInfo = struct {
                     },
                 },
                 data_render_settings.RenderType.Scanline => unreachable,
-                data_render_settings.RenderType.SingleThread => unreachable,
+                data_render_settings.RenderType.Pixel => unreachable,
             },
         };
     }

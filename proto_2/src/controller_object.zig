@@ -89,7 +89,7 @@ pub fn add_camera(
     const handle_name: data_handles.HandleObjectName = try self._add_name(name);
     errdefer self._remove_name(handle_name);
 
-    const handle_tmatrix: data_handles.HandleTMatrix = try self._new_add_tmatrix(tmatrix);
+    const handle_tmatrix: data_handles.HandleTMatrix = try self._add_tmatrix(tmatrix);
     errdefer self._remove_tmatrix(handle_tmatrix);
 
     const handle_camera = data_handles.HandleCamera{
@@ -114,7 +114,7 @@ pub fn add_shape(
     const handle_name: data_handles.HandleObjectName = try self._add_name(name);
     errdefer self._remove_name(handle_name);
 
-    const handle_tmatrix: data_handles.HandleTMatrix = try self._new_add_tmatrix(tmatrix);
+    const handle_tmatrix: data_handles.HandleTMatrix = try self._add_tmatrix(tmatrix);
     errdefer self._remove_tmatrix(handle_tmatrix);
 
     const handle_shape = data_handles.HandleShape{ .idx = self.array_shape.items.len };
@@ -246,14 +246,7 @@ fn _remove_name(self: *ControllerObject, handle: data_handles.HandleObjectName) 
     }
 }
 
-// TODO: remove me
-fn _add_tmatrix(self: *ControllerObject) !data_handles.HandleTMatrix {
-    const idx: usize = self.array_tmatrix.items.len;
-    try self.array_tmatrix.append(TMatrix.create_identity());
-    return data_handles.HandleTMatrix{ .idx = idx };
-}
-
-fn _new_add_tmatrix(self: *ControllerObject, tmatrix: TMatrix) !data_handles.HandleTMatrix {
+fn _add_tmatrix(self: *ControllerObject, tmatrix: TMatrix) !data_handles.HandleTMatrix {
     const idx: usize = self.array_tmatrix.items.len;
     try self.array_tmatrix.append(tmatrix);
     return data_handles.HandleTMatrix{ .idx = idx };

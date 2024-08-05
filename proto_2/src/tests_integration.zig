@@ -57,7 +57,7 @@ test "prepare_render" {
     );
 
     const handle_cam: data_handles.HandleCamera = try controller_object.add_camera(
-        "camera1",
+        "camera_1",
         Camera{ .Perspective = .{} },
         TMatrix.create_at_position(Vec3f32{ .x = 1, .y = 2, .z = 3 }),
     );
