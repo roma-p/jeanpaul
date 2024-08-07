@@ -20,12 +20,12 @@ pub fn check_ray_hit_implicit_sphere(
     //   b = 2 * ray_direction * (ray_origin - sphere_position)
     //   c = (ray_origin - sphere_position) ^2 - r^2
 
-    const L = ray_origin.substract_vector(&sphere_position);
+    const L = ray_origin.substract_vector(sphere_position);
     // from ray origin to sphere center
 
-    const a: f32 = ray_direction.product_dot(&ray_direction);
-    const b: f32 = 2 * (ray_direction.product_dot(&L));
-    const c: f32 = L.product_dot(&L) - (sphere_radius * sphere_radius);
+    const a: f32 = ray_direction.product_dot(ray_direction);
+    const b: f32 = 2 * (ray_direction.product_dot(L));
+    const c: f32 = L.product_dot(L) - (sphere_radius * sphere_radius);
 
     const solution = try maths.solve_quadratic(a, b, c);
     const solution_number = solution.@"0";
@@ -56,14 +56,15 @@ pub fn check_ray_hit_implicit_plane(
     // no solution if ray_direction dot plane_normal == 0 (if there are colinear, no intersection)
     // we only consider t > 0.
 
-    const denominator = ray_direction.product_dot(&plane_normal);
+    const denominator = ray_direction.product_dot(plane_normal);
+
     // TODO: use "almost equal".
     if (denominator < EPSILON and denominator > EPSILON) { // absolute!
         return .{ 0, 0 };
     }
 
-    var _tmp = plane_position.substract_vector(&ray_origin);
-    const numerator = _tmp.product_dot(&plane_normal);
+    var _tmp = plane_position.substract_vector(ray_origin);
+    const numerator = _tmp.product_dot(plane_normal);
 
     const t: f32 = numerator / denominator;
 

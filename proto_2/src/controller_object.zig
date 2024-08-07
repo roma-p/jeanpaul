@@ -16,6 +16,9 @@ const TMatrix = maths_tmat.TMatrix;
 
 const data_handles = @import("data_handle.zig");
 
+const utils_collision = @import("utils_collision.zig");
+const utils_normal = @import("utils_normal.zig");
+
 pub const ControllerObject = @This();
 
 const ErrorControllerObject = error{ NameAlreadyTaken, InvalidHandle };
@@ -63,8 +66,6 @@ pub const ShapeEntity = struct {
     handle_name: data_handles.HandleObjectName,
     handle_material: data_handles.HandleMaterial,
     handle_tmatrix: data_handles.HandleTMatrix,
-
-    const IMPLICIT_PLANE_DIRECTION = Vec3f32.create_y();
 };
 
 pub const EnvironmentEntity = struct {
@@ -224,6 +225,52 @@ pub fn set_position_from_tmatrix_handle(
 ) ErrorControllerObject!void {
     const ptr = try self.get_tmatrix_pointer(handle);
     ptr.set_position(pos);
+}
+
+pub fn send_ray_on_shapes(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    ray_origin: Vec3f32,
+) struct { p: ?Vec3f32, t: f32, n: Vec3f32 } {
+    var t: f32 = 0;
+    var buffer_shape: ShapeEntity = undefined;
+    var buffer_tmat: TMatrix = undefined;
+    for (self.array_shape.items) |*item| {
+        if (item.*) |shape_capture| {
+            const tmat = self.array_tmatrix.items[shape_capture.handle_tmatrix.idx].?;
+            const position = tmat.get_position();
+            const hit = try switch (shape_capture.data) {
+                definitions.ShapeEnum.ImplicitSphere => utils_collision.check_ray_hit_implicit_sphere(
+                    ray_direction,
+                    ray_origin,
+                    position,
+                    shape_capture.data.ImplicitSphere.radius,
+                ),
+                definitions.ShapeEnum.ImplicitPlane => utils_collision.check_ray_hit_implicit_plane(
+                    ray_direction,
+                    ray_origin,
+                    position,
+                    shape_capture.data.ImplicitPlane.normal,
+                ),
+            };
+            if (hit.@"0" == 0) continue;
+            if (t == 0 or hit.@"1" < t) {
+                t = hit.@"1";
+                buffer_shape = shape_capture;
+                buffer_tmat = tmat;
+            }
+        }
+    }
+    if (t == 0) {
+        return .{ .p = null, .t = 0, .n = Vec3f32.create_origin() };
+    } else {
+        const p = ray_direction.product(t).sum_vector(ray_origin);
+        const n = switch (buffer_shape.data) {
+            definitions.ShapeEnum.ImplicitSphere => utils_normal.get_normal_on_implicit_sphere(buffer_tmat.get_position(), p),
+            definitions.ShapeEnum.ImplicitPlane => utils_normal.get_normal_on_implicit_plane(buffer_tmat, buffer_shape.data.ImplicitPlane.normal),
+        };
+        return .{ .p = p, .t = t, .n = n };
+    }
 }
 
 fn _add_name(self: *ControllerObject, name: []const u8) !data_handles.HandleObjectName {

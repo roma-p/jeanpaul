@@ -18,6 +18,10 @@ pub const Vec3f32 = struct {
 
     const Self = @This();
 
+    pub fn create_origin() Self {
+        return .{ .x = 0, .y = 0, .z = 0 };
+    }
+
     pub fn create_x() Self {
         return .{ .x = 1, .y = 0, .z = 0 };
     }

@@ -6,6 +6,14 @@ pub const Color = struct {
     g: f32 = undefined,
     b: f32 = undefined,
 
+    pub fn create_from_value_not_clamped(value: f32) Color {
+        return Color{
+            .r = value,
+            .g = value,
+            .b = value,
+        };
+    }
+
     pub fn multiply(self: Color, x: f32) Color {
         return Color{
             .r = _clamp(x * self.r),
@@ -39,7 +47,22 @@ pub const Color = struct {
         };
     }
 
-    pub fn _clamp(value: f32) f32 {
+    pub fn log_debug(self: Color) void {
+        std.debug.print(
+            "\nColor -> r:{d}, g:{d}, b:{d}\n",
+            .{ self.r, self.g, self.b },
+        );
+    }
+
+    pub fn clamp(self: Color) Color {
+        return Color{
+            .r = _clamp(self.r),
+            .g = _clamp(self.g),
+            .b = _clamp(self.b),
+        };
+    }
+
+    fn _clamp(value: f32) f32 {
         return @max(@min(value, 1), 0);
     }
 };

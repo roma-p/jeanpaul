@@ -45,4 +45,14 @@ pub const PixelPayload = struct {
         const sampled_value = value.multiply(self.sample_nbr_invert);
         aov_ptr.?.* = aov_ptr.?.sum_color(sampled_value);
     }
+
+    pub fn check_has_aov(self: *Self, aov_standard: AovStandardEnum) bool {
+        // TODO: syntaxic sugar for this...
+        const v = self.aov_to_color.get(aov_standard);
+        if (v == null) {
+            return false;
+        } else {
+            return true;
+        }
+    }
 };

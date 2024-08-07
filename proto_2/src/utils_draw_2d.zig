@@ -69,6 +69,30 @@ pub fn draw_circle(img: *Img, pos: Vec2u16, radius: u16, color: Color) void {
     }
 }
 
+pub fn auto_clamp_img(img: *Img) void {
+    var max_value: f32 = 0;
+    var x: usize = 0;
+    var y: usize = 0;
+    while (x < img.width) : (x += 1) {
+        y = 0;
+        while (y < img.height) : (y += 1) {
+            const v = img.data[x][y];
+            if (v.r > max_value) max_value = v.r;
+            if (v.g > max_value) max_value = v.g;
+            if (v.b > max_value) max_value = v.b;
+        }
+    }
+    x = 0;
+    while (x < img.width) : (x += 1) {
+        y = 0;
+        while (y < img.height) : (y += 1) {
+            img.data[x][y].r = img.data[x][y].r / max_value;
+            img.data[x][y].g = img.data[x][y].g / max_value;
+            img.data[x][y].b = img.data[x][y].b / max_value;
+        }
+    }
+}
+
 fn _compute_bounding_rectangle(
     img: *Img,
     pos: Vec2u16,

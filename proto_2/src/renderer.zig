@@ -14,6 +14,7 @@ const AovStandardEnum = definitions.AovStandardEnum;
 const utils_zig = @import("utils_zig.zig");
 const utils_logging = @import("utils_logging.zig");
 const utils_camera = @import("utils_camera.zig");
+const utils_draw_2d = @import("utils_draw_2d.zig");
 const utils_tile_rendering = @import("utils_tile_rendering.zig");
 
 const data_handles = @import("data_handle.zig");
@@ -201,11 +202,18 @@ pub fn render(
         .{ time_struct.hour, time_struct.min, time_struct.sec },
     );
 
+    // clamping depth for ppm format. remove this when .exr supported.
+    const image_layer_idx = self.aov_to_image_layer.get(AovStandardEnum.Depth);
+    if (image_layer_idx != null) {
+        const depth_layer = self.controller_img.array_image_layer.items[image_layer_idx.?];
+        utils_draw_2d.auto_clamp_img(depth_layer);
+    }
+
     try self.controller_img.write_ppm(dir, img_name);
 }
 
 fn prepare_render(self: *Renderer, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !void {
-    // 1. prepare controller img.
+    // 1. prepare control pixel_payload.check_has_aov(ler img.
     for (self.controller_scene.controller_aov.array_aov_standard.items) |aov| {
         const aov_name = @tagName(aov);
         const img_layer_idx = try self.controller_img.register_image_layer(aov_name);
@@ -271,7 +279,7 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
 
     const render_info = self.render_info;
 
-    _ = utils_camera.get_ray_direction_from_focal_plane(
+    const ray_vector = utils_camera.get_ray_direction_from_focal_plane(
         render_info.camera_position,
         render_info.focal_plane_center,
         render_info.image_width_f32,
@@ -283,12 +291,43 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
     );
 
     render_data_per_thread.pixel_payload.add_sample_to_aov(AovStandardEnum.Beauty, data_color.COLOR_RED);
-    render_data_per_thread.pixel_payload.add_sample_to_aov(AovStandardEnum.Normal, data_color.COLOR_GREY);
+
+    // launch primary rays...
+    const hit = self.controller_scene.controller_object.send_ray_on_shapes(ray_vector, render_info.camera_position);
+
+    if (hit.p == null) return;
+
+    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Alpha)) {
+        render_data_per_thread.pixel_payload.add_sample_to_aov(
+            AovStandardEnum.Alpha,
+            data_color.COLOR_WHITE,
+        );
+    }
+
+    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Depth)) {
+        // /!\ value not clamped...
+        render_data_per_thread.pixel_payload.add_sample_to_aov(
+            AovStandardEnum.Depth,
+            data_color.Color.create_from_value_not_clamped(hit.t),
+        );
+    }
+
+    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Normal)) {
+        render_data_per_thread.pixel_payload.add_sample_to_aov(
+            AovStandardEnum.Normal,
+            data_color.Color{
+                .r = (hit.n.x + 1) / 2,
+                .g = (hit.n.y + 1) / 2,
+                .b = (hit.n.z + 1) / 2,
+            },
+        );
+    }
 }
 
 // -- Render Type : Tile -----------------------------------------------------
 
 pub fn render_tile(self: *Renderer) !void {
+    // Maybe this directly in "render"?
     const thread_nbr = self.render_info.thread_nbr;
     var i: usize = 0;
     while (i < thread_nbr) : (i += 1) {
