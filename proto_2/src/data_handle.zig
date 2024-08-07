@@ -28,3 +28,8 @@ pub const HandleObjectWithTMatrixEnum = union(enum) {
     HandleCamera: HandleCamera,
     HandleShape: HandleShape,
 };
+
+pub const HandleHRayHittableObjects = union {
+    HandleShape: HandleShape,
+    HandleEnv: HandleEnv,
+};

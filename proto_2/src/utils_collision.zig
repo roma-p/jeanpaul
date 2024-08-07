@@ -4,12 +4,17 @@ const maths = @import("maths.zig");
 
 const EPSILON = constants.EPSILON;
 
+pub const HitResult = struct {
+    hit: u1,
+    t: f32,
+};
+
 pub fn check_ray_hit_implicit_sphere(
     ray_direction: maths_vec.Vec3f32,
     ray_origin: maths_vec.Vec3f32,
     sphere_position: maths_vec.Vec3f32,
     sphere_radius: f32,
-) !struct { u1, f32 } {
+) !HitResult {
 
     // - equation of the ray is : ray_origin + t * ray_direction = P
     //   where t is a scalar and p a Vec3f32 position on the 3d space.
@@ -31,9 +36,9 @@ pub fn check_ray_hit_implicit_sphere(
     const solution_number = solution.@"0";
 
     switch (solution_number) {
-        0 => return .{ 0, 0 },
-        1 => return .{ 1, solution.@"1" },
-        2 => return .{ 1, solution.@"1" }, // assuming smaller solution is always on field 1.
+        0 => return .{ .hit = 0, .t = 0 },
+        1 => return .{ .hit = 1, .t = solution.@"1" },
+        2 => return .{ .hit = 1, .t = solution.@"1" }, // assuming smaller solution is always on field 1.
         inline else => unreachable,
     }
 }
@@ -43,7 +48,7 @@ pub fn check_ray_hit_implicit_plane(
     ray_origin: maths_vec.Vec3f32,
     plane_position: maths_vec.Vec3f32,
     plane_normal: maths_vec.Vec3f32,
-) !struct { u1, f32 } {
+) !HitResult {
 
     // - equation of the ray is : ray_origin + t * ray_direction = P
     //   where t is a scalar and p a Vec3f32 position on the 3d space.
@@ -60,7 +65,7 @@ pub fn check_ray_hit_implicit_plane(
 
     // TODO: use "almost equal".
     if (denominator < EPSILON and denominator > EPSILON) { // absolute!
-        return .{ 0, 0 };
+        return .{ .hit = 0, .t = 0 };
     }
 
     var _tmp = plane_position.substract_vector(ray_origin);
@@ -68,7 +73,16 @@ pub fn check_ray_hit_implicit_plane(
 
     const t: f32 = numerator / denominator;
 
-    if (t <= EPSILON) return .{ 0, 0 };
+    if (t <= EPSILON) return .{ .hit = 0, .t = 0 };
 
-    return .{ 1, t };
+    return .{ .hit = 1, .t = t };
+}
+
+pub fn check_ray_hit_skydome(ray_direction: maths_vec.Vec3f32, ray_origin: maths_vec.Vec3f32) !HitResult {
+    return check_ray_hit_implicit_sphere(
+        ray_direction,
+        ray_origin,
+        maths_vec.Vec3f32.create_origin(),
+        1000000,
+    );
 }

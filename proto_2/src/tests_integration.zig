@@ -27,9 +27,14 @@ test "prepare_render" {
     var controller_aov = &controller_scene.controller_aov;
     var controller_mat = &controller_scene.controller_material;
 
-    const handle_mat_default = try controller_mat.add_material(
-        "default",
+    const handle_mat_lambert_red = try controller_mat.add_material(
+        "red",
         Material{ .Lambertian = .{ .base_color = data_color.COLOR_RED } },
+    );
+
+    const handle_mat_lambert_blue = try controller_mat.add_material(
+        "blue",
+        Material{ .Lambertian = .{ .base_color = data_color.COLOR_BLUE } },
     );
 
     const handle_mat_sky = try controller_mat.add_material(
@@ -41,14 +46,14 @@ test "prepare_render" {
         "sphere_1",
         Shape{ .ImplicitSphere = .{ .radius = 5 } },
         TMatrix.create_at_position(Vec3f32{ .x = 7, .y = 3, .z = 4 }),
-        handle_mat_default,
+        handle_mat_lambert_red,
     );
 
     _ = try controller_object.add_shape(
         "plane_1",
         Shape{ .ImplicitPlane = .{ .normal = Vec3f32.create_y() } },
         TMatrix.create_at_position(Vec3f32{ .x = 0, .y = -8, .z = 0 }),
-        handle_mat_default,
+        handle_mat_lambert_blue,
     );
 
     _ = try controller_object.add_env(
@@ -69,6 +74,7 @@ test "prepare_render" {
 
     try controller_aov.add_aov_standard(AovStandard.Beauty);
     try controller_aov.add_aov_standard(AovStandard.Alpha);
+    try controller_aov.add_aov_standard(AovStandard.Albedo);
     try controller_aov.add_aov_standard(AovStandard.Normal);
     try controller_aov.add_aov_standard(AovStandard.Depth);
 

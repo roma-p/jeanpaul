@@ -58,7 +58,7 @@ pub fn get_mat_pointer(
     self: *ControllerMaterial,
     handle: data_handles.HandleMaterial,
 ) ErrorControllerMaterial!*Material {
-    if (handle.idx > self.array_env.items.len) {
+    if (handle.idx > self.array_material.items.len) {
         return ErrorControllerMaterial.InvalidHandle;
     }
     if (self.array_material.items[handle.idx]) |*v| {

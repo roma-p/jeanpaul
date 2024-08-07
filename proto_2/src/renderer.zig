@@ -43,6 +43,8 @@ render_shared_data: RenderDataShared,
 array_thread: std.ArrayList(Thread),
 array_render_data_per_thread: std.ArrayList(RenderDataPerThread),
 
+const AOV_NOT_CLAMP = [_]AovStandardEnum{AovStandardEnum.Depth};
+
 pub fn init(controller_scene: *ControllereScene) Renderer {
     return .{
         .controller_scene = controller_scene,
@@ -202,6 +204,8 @@ pub fn render(
         .{ time_struct.hour, time_struct.min, time_struct.sec },
     );
 
+    // TODO: iterate over aov_to_image_layer. if not in "non clamp", clamp it.
+
     // clamping depth for ppm format. remove this when .exr supported.
     const image_layer_idx = self.aov_to_image_layer.get(AovStandardEnum.Depth);
     if (image_layer_idx != null) {
@@ -262,7 +266,7 @@ fn render_single_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
 
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
-        self.render_single_px_single_sample(x, y, thread_idx);
+        try self.render_single_px_single_sample(x, y, thread_idx);
     }
     var it = pixel_payload.aov_to_color.iterator();
     while (it.next()) |item| {
@@ -271,7 +275,7 @@ fn render_single_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     }
 }
 
-fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) void {
+fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
 
     const x_f32 = utils_zig.cast_u16_to_f32(x);
@@ -295,7 +299,7 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
     // launch primary rays...
     const hit = self.controller_scene.controller_object.send_ray_on_shapes(ray_vector, render_info.camera_position);
 
-    if (hit.p == null) return;
+    if (hit.does_hit == 0) return;
 
     if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Alpha)) {
         render_data_per_thread.pixel_payload.add_sample_to_aov(
@@ -319,6 +323,18 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
                 .r = (hit.n.x + 1) / 2,
                 .g = (hit.n.y + 1) / 2,
                 .b = (hit.n.z + 1) / 2,
+            },
+        );
+    }
+
+    const ptr_mat = try self.controller_scene.controller_material.get_mat_pointer(hit.handle_mat);
+
+    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Albedo)) {
+        render_data_per_thread.pixel_payload.add_sample_to_aov(
+            AovStandardEnum.Albedo,
+            switch (ptr_mat.*) {
+                definitions.MaterialEnum.Lambertian => |v| v.base_color,
+                inline else => unreachable,
             },
         );
     }

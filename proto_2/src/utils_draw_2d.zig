@@ -93,6 +93,17 @@ pub fn auto_clamp_img(img: *Img) void {
     }
 }
 
+pub fn clamp_img(img: *Img) void {
+    var x: usize = 0;
+    var y: usize = 0;
+    while (x < img.width) : (x += 1) {
+        y = 0;
+        while (y < img.height) : (y += 1) {
+            img.data[x][y] = img.data[x][y].clamp();
+        }
+    }
+}
+
 fn _compute_bounding_rectangle(
     img: *Img,
     pos: Vec2u16,

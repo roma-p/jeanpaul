@@ -23,9 +23,6 @@ pub const ControllerObject = @This();
 
 const ErrorControllerObject = error{ NameAlreadyTaken, InvalidHandle };
 
-// Assuming one default material was created.
-const HANDLE_DEFAULT_MATERIAL = data_handles.HandleMaterial{ .idx = 0 };
-
 // "entities"
 array_camera: std.ArrayList(?CameraEntity),
 array_shape: std.ArrayList(?ShapeEntity),
@@ -79,6 +76,16 @@ pub const ObjectPointerEnum = union(data_handles.HandleObjectAllEnum) {
     HandleEnv: *const EnvironmentEntity,
     HandleObjectName: *const []u8,
     HandleTMatrix: *const TMatrix,
+};
+
+pub const HitRecord = struct {
+    does_hit: u1 = 0, // 0: false, 1: true
+    face_side: u1 = 0, // 0: front side, 1: back side.
+    p: Vec3f32 = maths_vec.Vec3f32.create_origin(), // hit point position.
+    t: f32 = 0, // ray distance.
+    n: Vec3f32 = maths_vec.Vec3f32.create_origin(), // normal
+    handle_mat: data_handles.HandleMaterial = undefined,
+    handle_hittable: data_handles.HandleHRayHittableObjects = undefined,
 };
 
 pub fn add_camera(
@@ -227,49 +234,196 @@ pub fn set_position_from_tmatrix_handle(
     ptr.set_position(pos);
 }
 
+pub fn check_collision_with_shape(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    ray_origin: Vec3f32,
+    shape_idx: usize,
+) !utils_collision.HitResult {
+    const shape = self.array_shape.items[shape_idx].?;
+    const tmat = self.array_tmatrix.items[shape.handle_tmatrix.idx].?;
+    const pos = tmat.get_position();
+    return try switch (shape.data) {
+        .ImplicitSphere => utils_collision.check_ray_hit_implicit_sphere(
+            ray_direction,
+            ray_origin,
+            pos,
+            shape.data.ImplicitSphere.radius,
+        ),
+        .ImplicitPlane => utils_collision.check_ray_hit_implicit_plane(
+            ray_direction,
+            ray_origin,
+            pos,
+            shape.data.ImplicitPlane.normal,
+        ),
+    };
+}
+
+pub fn check_collision_with_env(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    ray_origin: Vec3f32,
+    env_idx: usize,
+) !utils_collision.HitResult {
+    const env = self.array_env.items[env_idx].?;
+    return try switch (env.data) {
+        .ImplicitSphere => return utils_collision.check_ray_hit_skydome(
+            ray_direction,
+            ray_origin,
+        ),
+        inline else => unreachable,
+    };
+}
+
+pub fn get_shape_normal(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    shape_idx: usize,
+    hit_point: Vec3f32,
+) struct { normal: Vec3f32, face_side: u1 } {
+    const shape = self.array_shape.items[shape_idx].?;
+    const tmat = self.array_tmatrix.items[shape.handle_tmatrix.idx].?;
+    const n = switch (shape.data) {
+        .ImplicitSphere => utils_normal.get_normal_on_implicit_sphere(
+            tmat.get_position(),
+            hit_point,
+        ),
+        .ImplicitPlane => utils_normal.get_normal_on_implicit_plane(
+            tmat,
+            shape.data.ImplicitPlane.normal,
+        ),
+    };
+    const face_side: u1 = if (ray_direction.product_dot(n) > 0) 0 else 1;
+    return .{ .normal = n, .face_side = face_side };
+}
+
+pub fn get_env_normal(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    env_idx: usize,
+    hit_point: Vec3f32,
+) struct { normal: Vec3f32, face_side: u1 } {
+    const shape = self.array_env.items[env_idx].?;
+    const n = switch (shape.data) {
+        .SkyDome => utils_normal.get_normal_on_skydome(hit_point),
+        inline else => unreachable,
+    };
+    const face_side: u1 = if (ray_direction.product_dot(n) > 0) 0 else 1;
+    return .{ .normal = n, .face_side = face_side };
+}
+
 pub fn send_ray_on_shapes(
     self: *ControllerObject,
     ray_direction: Vec3f32,
     ray_origin: Vec3f32,
-) struct { p: ?Vec3f32, t: f32, n: Vec3f32 } {
-    var t: f32 = 0;
-    var buffer_shape: ShapeEntity = undefined;
-    var buffer_tmat: TMatrix = undefined;
-    for (self.array_shape.items) |*item| {
-        if (item.*) |shape_capture| {
-            const tmat = self.array_tmatrix.items[shape_capture.handle_tmatrix.idx].?;
-            const position = tmat.get_position();
-            const hit = try switch (shape_capture.data) {
-                definitions.ShapeEnum.ImplicitSphere => utils_collision.check_ray_hit_implicit_sphere(
-                    ray_direction,
-                    ray_origin,
-                    position,
-                    shape_capture.data.ImplicitSphere.radius,
-                ),
-                definitions.ShapeEnum.ImplicitPlane => utils_collision.check_ray_hit_implicit_plane(
-                    ray_direction,
-                    ray_origin,
-                    position,
-                    shape_capture.data.ImplicitPlane.normal,
-                ),
-            };
-            if (hit.@"0" == 0) continue;
-            if (t == 0 or hit.@"1" < t) {
-                t = hit.@"1";
-                buffer_shape = shape_capture;
-                buffer_tmat = tmat;
-            }
+) HitRecord {
+    var buffer_t: f32 = 0;
+    var buffer_shape_idx: usize = undefined;
+
+    var i: usize = 0;
+
+    while (i < self.array_shape.items.len) : (i += 1) {
+        const hit_result: utils_collision.HitResult = try self.check_collision_with_shape(
+            ray_direction,
+            ray_origin,
+            i,
+        );
+        if (hit_result.hit == 0) continue;
+        if (buffer_t == 0 or hit_result.t < buffer_t) {
+            buffer_t = hit_result.t;
+            buffer_shape_idx = i;
         }
     }
-    if (t == 0) {
-        return .{ .p = null, .t = 0, .n = Vec3f32.create_origin() };
+
+    if (buffer_t == 0) return HitRecord{};
+
+    const p = ray_direction.product(buffer_t).sum_vector(ray_origin);
+    const normal_info = self.get_shape_normal(ray_direction, buffer_shape_idx, p);
+    const handle_mat = self.array_shape.items[buffer_shape_idx].?.handle_material;
+
+    const handle_shape = data_handles.HandleShape{ .idx = buffer_shape_idx };
+    const handle_hittable = data_handles.HandleHRayHittableObjects{ .HandleShape = handle_shape };
+
+    return HitRecord{
+        .does_hit = 1,
+        .face_side = normal_info.face_side,
+        .p = p,
+        .t = buffer_t,
+        .n = normal_info.normal,
+        .handle_mat = handle_mat,
+        .handle_hittable = handle_hittable,
+    };
+}
+
+pub fn send_ray_on_env(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    ray_origin: Vec3f32,
+) HitRecord {
+    var buffer_t: f32 = 0;
+    var buffer_env_idx: usize = undefined;
+
+    var i: usize = 0;
+
+    while (i < self.array_env.items.len) : (i += 1) {
+        const hit_result: utils_collision.HitResult = try self.check_collision_with_env(
+            ray_direction,
+            ray_origin,
+            i,
+        );
+        if (hit_result.hit == 0) continue;
+        if (buffer_t == 0 or hit_result.t < buffer_t) {
+            buffer_t = hit_result.t;
+            buffer_env_idx = i;
+        }
+    }
+
+    if (buffer_t == 0) return HitRecord{};
+
+    const p = ray_direction.product(buffer_t).sum_vector(ray_origin);
+    const normal_info = self.get_shape_normal(ray_direction, buffer_env_idx, p);
+    const handle_mat = switch (self.array_env.items[buffer_env_idx].?.data) {
+        .SkyDome => |v| v.handle_material,
+        inline else => undefined,
+    };
+
+    const handle_env = data_handles.HandleEnv{ .idx = buffer_env_idx };
+    const handle_hittable = data_handles.HandleHRayHittableObjects{ .HandleEnv = handle_env };
+
+    return HitRecord{
+        .does_hit = 1,
+        .face_side = normal_info.face_side,
+        .p = p,
+        .t = buffer_t,
+        .n = normal_info.normal,
+        .handle_mat = handle_mat,
+        .handle_hittable = handle_hittable,
+    };
+}
+
+pub fn send_ray_on_hittable(
+    self: *ControllerObject,
+    ray_direction: Vec3f32,
+    ray_origin: Vec3f32,
+) HitRecord {
+    const hit_record_shape = self.send_ray_on_shapes(ray_direction, ray_origin);
+    const hit_record_env = self.send_ray_on_env(ray_direction, ray_origin);
+    const hit_slice = [_]HitRecord{ hit_record_shape, hit_record_env };
+
+    var buffer_hit_record: HitRecord = undefined;
+    var buffer_t: f32 = 0;
+
+    for (hit_slice) |hit_record| {
+        if (buffer_t == 0 or (buffer_hit_record.t < buffer_t)) {
+            buffer_hit_record = hit_record;
+            buffer_t = buffer_hit_record.t;
+        }
+    }
+
+    if (buffer_t == 0) {
+        return HitRecord{};
     } else {
-        const p = ray_direction.product(t).sum_vector(ray_origin);
-        const n = switch (buffer_shape.data) {
-            definitions.ShapeEnum.ImplicitSphere => utils_normal.get_normal_on_implicit_sphere(buffer_tmat.get_position(), p),
-            definitions.ShapeEnum.ImplicitPlane => utils_normal.get_normal_on_implicit_plane(buffer_tmat, buffer_shape.data.ImplicitPlane.normal),
-        };
-        return .{ .p = p, .t = t, .n = n };
+        return buffer_hit_record;
     }
 }
 

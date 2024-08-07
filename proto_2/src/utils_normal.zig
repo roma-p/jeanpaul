@@ -15,3 +15,7 @@ pub fn get_normal_on_implicit_sphere(sphere_center_pos: Vec3f32, point_pos: Vec3
 pub fn get_normal_on_implicit_plane(plane_tmatrix: TMatrix, plane_normal: Vec3f32) Vec3f32 {
     return plane_tmatrix.multiply_with_vec3(plane_normal).normalize();
 }
+
+pub fn get_normal_on_skydome(point_pos: Vec3f32) Vec3f32 {
+    return point_pos.substract_vector(Vec3f32.create_origin()).product(-1).normalize();
+}
