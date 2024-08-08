@@ -2,6 +2,8 @@ const std = @import("std");
 const mem = std.mem;
 const gpa = std.heap.page_allocator;
 
+const constants = @import("constants.zig");
+
 const definitions = @import("definitions.zig");
 const ShapeEnum = definitions.ShapeEnum;
 const Shape = definitions.Shape;
@@ -16,8 +18,7 @@ const TMatrix = maths_tmat.TMatrix;
 
 const data_handles = @import("data_handle.zig");
 
-const utils_collision = @import("utils_collision.zig");
-const utils_normal = @import("utils_normal.zig");
+const utils_geo = @import("utils_geo.zig");
 
 pub const ControllerObject = @This();
 
@@ -239,18 +240,18 @@ pub fn check_collision_with_shape(
     ray_direction: Vec3f32,
     ray_origin: Vec3f32,
     shape_idx: usize,
-) !utils_collision.HitResult {
+) !utils_geo.HitResult {
     const shape = self.array_shape.items[shape_idx].?;
     const tmat = self.array_tmatrix.items[shape.handle_tmatrix.idx].?;
     const pos = tmat.get_position();
     return try switch (shape.data) {
-        .ImplicitSphere => utils_collision.check_ray_hit_implicit_sphere(
+        .ImplicitSphere => utils_geo.check_ray_hit_implicit_sphere(
             ray_direction,
             ray_origin,
             pos,
             shape.data.ImplicitSphere.radius,
         ),
-        .ImplicitPlane => utils_collision.check_ray_hit_implicit_plane(
+        .ImplicitPlane => utils_geo.check_ray_hit_implicit_plane(
             ray_direction,
             ray_origin,
             pos,
@@ -264,14 +265,13 @@ pub fn check_collision_with_env(
     ray_direction: Vec3f32,
     ray_origin: Vec3f32,
     env_idx: usize,
-) !utils_collision.HitResult {
+) !utils_geo.HitResult {
     const env = self.array_env.items[env_idx].?;
     return try switch (env.data) {
-        .ImplicitSphere => return utils_collision.check_ray_hit_skydome(
+        .SkyDome => return utils_geo.check_ray_hit_skydome(
             ray_direction,
             ray_origin,
         ),
-        inline else => unreachable,
     };
 }
 
@@ -284,11 +284,11 @@ pub fn get_shape_normal(
     const shape = self.array_shape.items[shape_idx].?;
     const tmat = self.array_tmatrix.items[shape.handle_tmatrix.idx].?;
     const n = switch (shape.data) {
-        .ImplicitSphere => utils_normal.get_normal_on_implicit_sphere(
+        .ImplicitSphere => utils_geo.get_normal_on_implicit_sphere(
             tmat.get_position(),
             hit_point,
         ),
-        .ImplicitPlane => utils_normal.get_normal_on_implicit_plane(
+        .ImplicitPlane => utils_geo.get_normal_on_implicit_plane(
             tmat,
             shape.data.ImplicitPlane.normal,
         ),
@@ -305,7 +305,7 @@ pub fn get_env_normal(
 ) struct { normal: Vec3f32, face_side: u1 } {
     const shape = self.array_env.items[env_idx].?;
     const n = switch (shape.data) {
-        .SkyDome => utils_normal.get_normal_on_skydome(hit_point),
+        .SkyDome => utils_geo.get_normal_on_skydome(hit_point),
         inline else => unreachable,
     };
     const face_side: u1 = if (ray_direction.product_dot(n) > 0) 0 else 1;
@@ -323,12 +323,12 @@ pub fn send_ray_on_shapes(
     var i: usize = 0;
 
     while (i < self.array_shape.items.len) : (i += 1) {
-        const hit_result: utils_collision.HitResult = try self.check_collision_with_shape(
+        const hit_result: utils_geo.HitResult = try self.check_collision_with_shape(
             ray_direction,
             ray_origin,
             i,
         );
-        if (hit_result.hit == 0) continue;
+        if (hit_result.hit == 0 or hit_result.t < constants.EPSILON) continue;
         if (buffer_t == 0 or hit_result.t < buffer_t) {
             buffer_t = hit_result.t;
             buffer_shape_idx = i;
@@ -366,12 +366,13 @@ pub fn send_ray_on_env(
     var i: usize = 0;
 
     while (i < self.array_env.items.len) : (i += 1) {
-        const hit_result: utils_collision.HitResult = try self.check_collision_with_env(
+        const hit_result: utils_geo.HitResult = try self.check_collision_with_env(
             ray_direction,
             ray_origin,
             i,
         );
-        if (hit_result.hit == 0) continue;
+        // TODO fix me.
+        // if (hit_result.hit == 0 or hit_result.t < constants.EPSILON) continue;term
         if (buffer_t == 0 or hit_result.t < buffer_t) {
             buffer_t = hit_result.t;
             buffer_env_idx = i;
@@ -384,7 +385,6 @@ pub fn send_ray_on_env(
     const normal_info = self.get_shape_normal(ray_direction, buffer_env_idx, p);
     const handle_mat = switch (self.array_env.items[buffer_env_idx].?.data) {
         .SkyDome => |v| v.handle_material,
-        inline else => undefined,
     };
 
     const handle_env = data_handles.HandleEnv{ .idx = buffer_env_idx };

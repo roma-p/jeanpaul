@@ -16,6 +16,9 @@ const utils_logging = @import("utils_logging.zig");
 const utils_camera = @import("utils_camera.zig");
 const utils_draw_2d = @import("utils_draw_2d.zig");
 const utils_tile_rendering = @import("utils_tile_rendering.zig");
+const utils_materials = @import("utils_materials.zig");
+
+const math_vec = @import("maths_vec.zig");
 
 const data_handles = @import("data_handle.zig");
 const data_color = @import("data_color.zig");
@@ -24,6 +27,7 @@ const data_render_settings = @import("data_render_settings.zig");
 const data_pixel_payload = @import("data_pixel_payload.zig");
 
 const ControllereScene = @import("controller_scene.zig");
+const ControllereObject = @import("controller_object.zig");
 const ControllerAov = @import("controller_aov.zig");
 const ControllerImg = @import("controller_img.zig");
 
@@ -31,6 +35,7 @@ const Renderer = @This();
 
 const RenderInfo = data_render_info.RenderInfo;
 const PixelPayload = data_pixel_payload.PixelPayload;
+const Vec3f32 = math_vec.Vec3f32;
 
 controller_scene: *ControllereScene,
 controller_img: ControllerImg,
@@ -277,13 +282,17 @@ fn render_single_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
 
 fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
+    var pixel_payload = &render_data_per_thread.pixel_payload;
+
+    var controller_object = &self.controller_scene.controller_object;
+    var controller_material = &self.controller_scene.controller_material;
 
     const x_f32 = utils_zig.cast_u16_to_f32(x);
     const y_f32 = utils_zig.cast_u16_to_f32(y);
 
     const render_info = self.render_info;
 
-    const ray_vector = utils_camera.get_ray_direction_from_focal_plane(
+    const ray_direction = utils_camera.get_ray_direction_from_focal_plane(
         render_info.camera_position,
         render_info.focal_plane_center,
         render_info.image_width_f32,
@@ -294,30 +303,53 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
         &render_data_per_thread.rnd,
     );
 
-    render_data_per_thread.pixel_payload.add_sample_to_aov(AovStandardEnum.Beauty, data_color.COLOR_RED);
+    //  -- launch primary rays -----------------------------------------------
 
-    // launch primary rays...
-    const hit = self.controller_scene.controller_object.send_ray_on_shapes(ray_vector, render_info.camera_position);
+    const hit = controller_object.send_ray_on_hittable(
+        ray_direction,
+        render_info.camera_position,
+    );
 
     if (hit.does_hit == 0) return;
 
-    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Alpha)) {
-        render_data_per_thread.pixel_payload.add_sample_to_aov(
+    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
+
+    //  -- if only hit environment, compute beauty and return. ---------------
+    switch (hit.handle_hittable) {
+        .HandleEnv => {
+            if (pixel_payload.check_has_aov(AovStandardEnum.Beauty)) {
+                pixel_payload.add_sample_to_aov(
+                    AovStandardEnum.Beauty,
+                    switch (ptr_mat.*) {
+                        definitions.MaterialEnum.Lambertian => |v| v.base_color,
+                        inline else => unreachable,
+                    },
+                );
+            }
+            return;
+        },
+        inline else => {},
+    }
+
+    // -- write AOV that only depends on primary rays ------------------------
+
+    if (pixel_payload.check_has_aov(AovStandardEnum.Alpha)) {
+        pixel_payload.add_sample_to_aov(
             AovStandardEnum.Alpha,
             data_color.COLOR_WHITE,
         );
     }
 
-    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Depth)) {
+    if (pixel_payload.check_has_aov(AovStandardEnum.Depth)) {
         // /!\ value not clamped...
-        render_data_per_thread.pixel_payload.add_sample_to_aov(
+        pixel_payload.add_sample_to_aov(
             AovStandardEnum.Depth,
             data_color.Color.create_from_value_not_clamped(hit.t),
         );
     }
 
-    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Normal)) {
-        render_data_per_thread.pixel_payload.add_sample_to_aov(
+    if (pixel_payload.check_has_aov(AovStandardEnum.Normal)) {
+        pixel_payload.add_sample_to_aov(
             AovStandardEnum.Normal,
             data_color.Color{
                 .r = (hit.n.x + 1) / 2,
@@ -327,10 +359,8 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
         );
     }
 
-    const ptr_mat = try self.controller_scene.controller_material.get_mat_pointer(hit.handle_mat);
-
-    if (render_data_per_thread.pixel_payload.check_has_aov(AovStandardEnum.Albedo)) {
-        render_data_per_thread.pixel_payload.add_sample_to_aov(
+    if (pixel_payload.check_has_aov(AovStandardEnum.Albedo)) {
+        pixel_payload.add_sample_to_aov(
             AovStandardEnum.Albedo,
             switch (ptr_mat.*) {
                 definitions.MaterialEnum.Lambertian => |v| v.base_color,
@@ -338,6 +368,51 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
             },
         );
     }
+
+    // -- doing the ray tracing ----------------------------------------------
+
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_WHITE);
+    try self.render_ray_trace(thread_idx, 0, hit);
+    pixel_payload.dump_buffer_to_aov();
+}
+
+fn render_ray_trace(self: *Renderer, thread_idx: usize, bounce_idx: u8, hit: ControllereObject.HitRecord) !void {
+    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
+    var pixel_payload = &render_data_per_thread.pixel_payload;
+
+    var controller_object = &self.controller_scene.controller_object;
+    var controller_material = &self.controller_scene.controller_material;
+
+    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
+
+    const scatter_result = try switch (ptr_mat.*) {
+        .Lambertian => |v| utils_materials.scatter_lambertian(
+            hit.p,
+            hit.n,
+            v.base_color,
+            v.base,
+            v.ambiant,
+            &render_data_per_thread.rnd,
+        ),
+        .Phong => unreachable,
+    };
+    pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
+
+    switch (hit.handle_hittable) {
+        .HandleEnv => return,
+        inline else => {},
+    }
+
+    if (bounce_idx == self.render_info.bounces) return;
+
+    const new_hit = controller_object.send_ray_on_hittable(
+        scatter_result.ray_direction,
+        scatter_result.ray_origin,
+    );
+
+    if (new_hit.does_hit == 0) return;
+
+    try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
 }
 
 // -- Render Type : Tile -----------------------------------------------------
@@ -370,21 +445,21 @@ fn render_tile_single_thread_func(self: *Renderer, thread_idx: usize) !void {
             pxl_rendered_nbr,
         );
         if (tile_to_render_idx) |value| {
-            const tile_bounding_rectangle = utils_tile_rendering.get_tile_bouding_rectangle_line_mode(
+            const tile_bounding_rect = utils_tile_rendering.get_tile_bouding_rectangle_line_mode(
                 render_info.data_per_render_type.Tile.tile_x_number,
                 value,
                 render_info.data_per_render_type.Tile.tile_size,
                 render_info.image_width,
                 render_info.image_height,
             );
-            pxl_rendered_nbr = utils_tile_rendering.get_tile_pixel_number(tile_bounding_rectangle);
+            pxl_rendered_nbr = utils_tile_rendering.get_tile_pixel_number(tile_bounding_rect);
 
-            var _x: u16 = tile_bounding_rectangle.x_min;
+            var _x: u16 = tile_bounding_rect.x_min;
             var _y: u16 = undefined;
 
-            while (_x <= tile_bounding_rectangle.x_max) : (_x += 1) {
-                _y = tile_bounding_rectangle.y_min;
-                while (_y <= tile_bounding_rectangle.y_max) : (_y += 1) {
+            while (_x <= tile_bounding_rect.x_max) : (_x += 1) {
+                _y = tile_bounding_rect.y_min;
+                while (_y <= tile_bounding_rect.y_max) : (_y += 1) {
                     try self.render_single_px(_x, _y, thread_idx);
                 }
             }

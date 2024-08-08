@@ -97,23 +97,6 @@ pub const Vec3f32 = struct {
             .{ self.x, self.y, self.z },
         );
     }
-
-    // TODO: test me.
-    pub fn gen_random_hemisphere_normalized(
-        self: Self,
-        rand_gen: *std.rand.DefaultPrng,
-    ) Self {
-        var ret = Self{
-            .x = rand_gen.random().float(f32) * 2 - 1,
-            .y = rand_gen.random().float(f32) * 2 - 1,
-            .z = rand_gen.random().float(f32) * 2 - 1,
-        };
-        ret = ret.normalize();
-        if (self.product_dot(&ret) < constants.EPSILON) {
-            ret = ret.product(-1);
-        }
-        return ret;
-    }
 };
 
 // -- TESTS ------------------------------------------------------------------

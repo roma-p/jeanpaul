@@ -14,7 +14,7 @@ pub const Color = struct {
         };
     }
 
-    pub fn multiply(self: Color, x: f32) Color {
+    pub fn product(self: Color, x: f32) Color {
         return Color{
             .r = x * self.r,
             .g = x * self.g,
@@ -33,6 +33,14 @@ pub const Color = struct {
             .r = self.r + color.r,
             .g = self.g + color.g,
             .b = self.b + color.b,
+        };
+    }
+
+    pub fn sum_with_float(self: Color, x: f32) Color {
+        return Color{
+            .r = self.r + x,
+            .g = self.g + x,
+            .b = self.b + x,
         };
     }
 
@@ -93,7 +101,7 @@ pub fn cast_jp_color_to_u8(color_value: f32) u8 {
 }
 
 test "multiply" {
-    const c = COLOR_GREY.multiply(0.3);
+    const c = COLOR_GREY.product(0.3);
     try std.testing.expectEqual(0.15, c.r);
     try std.testing.expectEqual(0.15, c.g);
     try std.testing.expectEqual(0.15, c.b);

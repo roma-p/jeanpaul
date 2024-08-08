@@ -30,12 +30,17 @@ pub const AovStandardEnum = enum {
     Alpha,
     Depth,
     Normal,
+    Direct,
+    Indirect,
 };
+
+pub const AovStandardNonRaytraced = [_]AovStandardEnum{ .Albedo, .Alpha, .Depth, .Normal };
 
 pub const Material = union(MaterialEnum) {
     Lambertian: struct {
         base: f32 = 0.7,
         base_color: Color = data_color.COLOR_GREY,
+        ambiant: f32 = 0.05,
     },
     Phong: struct {},
 };

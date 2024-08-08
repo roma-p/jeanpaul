@@ -29,7 +29,7 @@ pub const HandleObjectWithTMatrixEnum = union(enum) {
     HandleShape: HandleShape,
 };
 
-pub const HandleHRayHittableObjects = union {
+pub const HandleHRayHittableObjects = union(enum) {
     HandleShape: HandleShape,
     HandleEnv: HandleEnv,
 };
