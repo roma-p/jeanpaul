@@ -317,15 +317,13 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
     //  -- if only hit environment, compute beauty and return. ---------------
     switch (hit.handle_hittable) {
         .HandleEnv => {
-            if (pixel_payload.check_has_aov(AovStandardEnum.Beauty)) {
-                pixel_payload.add_sample_to_aov(
-                    AovStandardEnum.Beauty,
-                    switch (ptr_mat.*) {
-                        definitions.MaterialEnum.Lambertian => |v| v.base_color,
-                        inline else => unreachable,
-                    },
-                );
-            }
+            pixel_payload.add_sample_to_aov(
+                AovStandardEnum.Beauty,
+                switch (ptr_mat.*) {
+                    definitions.MaterialEnum.Lambertian => |v| v.base_color,
+                    inline else => unreachable,
+                },
+            );
             return;
         },
         inline else => {},
@@ -333,41 +331,30 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
 
     // -- write AOV that only depends on primary rays ------------------------
 
-    if (pixel_payload.check_has_aov(AovStandardEnum.Alpha)) {
-        pixel_payload.add_sample_to_aov(
-            AovStandardEnum.Alpha,
-            data_color.COLOR_WHITE,
-        );
-    }
+    pixel_payload.add_sample_to_aov(AovStandardEnum.Alpha, data_color.COLOR_WHITE);
 
-    if (pixel_payload.check_has_aov(AovStandardEnum.Depth)) {
-        // /!\ value not clamped...
-        pixel_payload.add_sample_to_aov(
-            AovStandardEnum.Depth,
-            data_color.Color.create_from_value_not_clamped(hit.t),
-        );
-    }
+    // /!\ value not clamped...
+    pixel_payload.add_sample_to_aov(
+        AovStandardEnum.Depth,
+        data_color.Color.create_from_value_not_clamped(hit.t),
+    );
 
-    if (pixel_payload.check_has_aov(AovStandardEnum.Normal)) {
-        pixel_payload.add_sample_to_aov(
-            AovStandardEnum.Normal,
-            data_color.Color{
-                .r = (hit.n.x + 1) / 2,
-                .g = (hit.n.y + 1) / 2,
-                .b = (hit.n.z + 1) / 2,
-            },
-        );
-    }
+    pixel_payload.add_sample_to_aov(
+        AovStandardEnum.Normal,
+        data_color.Color{
+            .r = (hit.n.x + 1) / 2,
+            .g = (hit.n.y + 1) / 2,
+            .b = (hit.n.z + 1) / 2,
+        },
+    );
 
-    if (pixel_payload.check_has_aov(AovStandardEnum.Albedo)) {
-        pixel_payload.add_sample_to_aov(
-            AovStandardEnum.Albedo,
-            switch (ptr_mat.*) {
-                definitions.MaterialEnum.Lambertian => |v| v.base_color,
-                inline else => unreachable,
-            },
-        );
-    }
+    pixel_payload.add_sample_to_aov(
+        AovStandardEnum.Albedo,
+        switch (ptr_mat.*) {
+            definitions.MaterialEnum.Lambertian => |v| v.base_color,
+            inline else => unreachable,
+        },
+    );
 
     // -- doing the ray tracing ----------------------------------------------
 
@@ -410,7 +397,10 @@ fn render_ray_trace(self: *Renderer, thread_idx: usize, bounce_idx: u8, hit: Con
         scatter_result.ray_origin,
     );
 
-    if (new_hit.does_hit == 0) return;
+    if (new_hit.does_hit == 0) {
+        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+        return;
+    }
 
     try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
 }

@@ -57,6 +57,7 @@ pub const PixelPayload = struct {
         aov_standard: AovStandardEnum,
         value: data_color.Color,
     ) void {
+        if (!self.check_has_aov(aov_standard)) return;
         const aov_ptr = self.aov_to_color.getPtr(aov_standard); // TODO: check for key existence....
         const sampled_value = value.product(self.sample_nbr_invert);
         aov_ptr.?.* = aov_ptr.?.sum_color(sampled_value);
