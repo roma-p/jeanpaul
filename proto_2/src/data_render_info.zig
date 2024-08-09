@@ -16,6 +16,8 @@ pub const RenderInfo = struct {
     image_width: u16,
     image_height: u16,
 
+    color_space: data_render_settings.ColorSpace,
+
     image_width_f32: f32,
     image_height_f32: f32,
 
@@ -112,6 +114,7 @@ pub const RenderInfo = struct {
             .camera_handle = camera_handle,
             .camera_position = camera_position,
             .thread_nbr = thread_nbr,
+            .color_space = scene_render_settings.color_space,
             .data_per_render_type = switch (scene_render_settings.render_type) {
                 data_render_settings.RenderType.Tile => RenderInfo.DataPerRenderType{
                     .Tile = .{

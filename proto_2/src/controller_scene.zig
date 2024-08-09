@@ -21,7 +21,7 @@ pub fn init() !ControllerScene {
         .controller_material = ControllerMaterial.init(),
         .controller_object = ControllerObject.init(),
         .controller_aov = ControllerAov.init(),
-        .render_settings = RenderSettings.create_with_default_value(),
+        .render_settings = RenderSettings{},
     };
 }
 

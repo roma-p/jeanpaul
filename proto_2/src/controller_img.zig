@@ -10,6 +10,10 @@ const data_color = @import("data_color.zig");
 const data_img = @import("data_img.zig");
 
 const utils_draw_2d = @import("utils_draw_2d.zig");
+const data_render_settings = @import("data_render_settings.zig");
+
+const Color = data_color.Color;
+const ColorSpace = data_render_settings.ColorSpace;
 
 pub const ControllerImg = @This();
 
@@ -66,7 +70,7 @@ pub fn write_to_px(
     x: u16,
     y: u16,
     layer_index: usize,
-    c: data_color.Color,
+    c: Color,
 ) ErrorControllerImg!void {
     if (x >= self.width or y >= self.height) {
         return ErrorControllerImg.InvalidPixel;
@@ -78,6 +82,7 @@ pub fn write_ppm(
     self: *ControllerImg,
     out_dir: []const u8,
     file_name: []const u8,
+    color_space: ColorSpace,
 ) !void {
     const layer_number = self.array_image_layer.items.len;
     var thread_array = std.ArrayList(std.Thread).init(gpa);
@@ -89,7 +94,7 @@ pub fn write_ppm(
             try std.Thread.spawn(
                 .{},
                 _write_ppm_single_layer,
-                .{ self, out_dir, file_name, i },
+                .{ self, out_dir, file_name, color_space, i },
             ),
         );
     }
@@ -103,6 +108,7 @@ fn _write_ppm_single_layer(
     self: *ControllerImg,
     out_dir: []const u8,
     file_name: []const u8,
+    color_space: ColorSpace,
     layer_id: usize,
 ) !void {
     var buffer_header: [256]u8 = undefined;
@@ -138,19 +144,27 @@ fn _write_ppm_single_layer(
         _x = 0;
         while (_x < self.width) : (_x += 1) {
             const px = self.array_image_layer.items[layer_id].*.data[_x][_y - 1];
+            const calibrated_px = _calibrate_to_color_space_pixel_color(px, color_space);
             const buffer_line_content = try std.fmt.bufPrint(
                 &buffer_line,
                 "\n{} {} {}",
                 .{
-                    data_color.cast_jp_color_to_u8(px.r),
-                    data_color.cast_jp_color_to_u8(px.g),
-                    data_color.cast_jp_color_to_u8(px.b),
+                    data_color.cast_jp_color_to_u8(calibrated_px.r),
+                    data_color.cast_jp_color_to_u8(calibrated_px.g),
+                    data_color.cast_jp_color_to_u8(calibrated_px.b),
                 },
             );
             try writer.writeAll(buffer_line_content);
         }
     }
     try buffer_writer.flush();
+}
+
+fn _calibrate_to_color_space_pixel_color(color: Color, color_space: ColorSpace) Color {
+    return switch (color_space) {
+        .DefaultLinear => color,
+        .DefaultGamma2 => utils_draw_2d.calibrate_color_from_defaultlinear_to_defaultgamma2(color),
+    };
 }
 
 test "controller_img" {
@@ -175,6 +189,6 @@ test "controller_img" {
         data_color.COLOR_RED,
     );
 
-    try controller_img.write_ppm("tests", "test");
+    try controller_img.write_ppm("tests", "test", ColorSpace.DefaultLinear);
     controller_img.deinit();
 }

@@ -218,7 +218,7 @@ pub fn render(
         utils_draw_2d.auto_clamp_img(depth_layer);
     }
 
-    try self.controller_img.write_ppm(dir, img_name);
+    try self.controller_img.write_ppm(dir, img_name, self.render_info.color_space);
 }
 
 fn prepare_render(self: *Renderer, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !void {

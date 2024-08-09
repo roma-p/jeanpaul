@@ -104,6 +104,14 @@ pub fn clamp_img(img: *Img) void {
     }
 }
 
+pub fn calibrate_color_from_defaultlinear_to_defaultgamma2(color: Color) Color {
+    return Color{
+        .r = @sqrt(color.r),
+        .g = @sqrt(color.g),
+        .b = @sqrt(color.b),
+    };
+}
+
 fn _compute_bounding_rectangle(
     img: *Img,
     pos: Vec2u16,
