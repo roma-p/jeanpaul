@@ -91,6 +91,10 @@ pub const Vec3f32 = struct {
         return @sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
     }
 
+    pub fn compute_length_squared(self: Self) f32 {
+        return self.x * self.x + self.y * self.y + self.z * self.z;
+    }
+
     pub fn log_debug(self: Self) void {
         std.debug.print(
             "\nVec -> x:{d}, y:{d}, z:{d}\n",

@@ -126,7 +126,7 @@ pub fn check_ray_hit_skydome(ray_direction: maths_vec.Vec3f32, ray_origin: maths
 
 // -- MISC --
 
-pub fn gen_random_hemisphere_normalized(
+pub fn gen_vec_random_hemisphere_normalized(
     normal: Vec3f32,
     rng: *RndGen,
 ) Vec3f32 {
@@ -139,5 +139,15 @@ pub fn gen_random_hemisphere_normalized(
     if (normal.product_dot(ret) < 0) {
         ret = ret.product(-1);
     }
+    return ret;
+}
+
+pub fn gen_vec_random_spheric_normalized(rng: *RndGen) Vec3f32 {
+    var ret = Vec3f32{
+        .x = rng.random().float(f32) * 2 - 1,
+        .y = rng.random().float(f32) * 2 - 1,
+        .z = rng.random().float(f32) * 2 - 1,
+    };
+    ret = ret.normalize();
     return ret;
 }

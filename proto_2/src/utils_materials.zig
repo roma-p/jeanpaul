@@ -24,7 +24,8 @@ pub fn scatter_lambertian(
     ambiant: f32,
     rng: *RndGen,
 ) !ScatterResult {
-    const direction = utils_geo.gen_random_hemisphere_normalized(normal, rng);
+    const direction = utils_geo.gen_vec_random_spheric_normalized(rng).sum_vector(normal);
+    // const direction = utils_geo.gen_vec_random_hemisphere_normalized(normal, rng);
     const tmp = base_color.product(intensity); //sum_with_float(ambiant * -1);
     const att = tmp.sum_with_float(ambiant * -1);
     return ScatterResult{
