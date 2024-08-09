@@ -35,3 +35,18 @@ pub fn scatter_lambertian(
         .attenuation = att,
     };
 }
+
+pub fn get_emitted_color(
+    color: Color,
+    intensity: f32,
+    exposition: f32,
+    decay_mode: definitions.LightDecayMode,
+    ray_length: f32,
+) Color {
+    const full_intensity = intensity * std.math.pow(f32, 2, exposition);
+    const with_decay = switch (decay_mode) {
+        .NoDecay => full_intensity,
+        .Quadratic => full_intensity / (ray_length * ray_length),
+    };
+    return color.product(with_decay);
+}

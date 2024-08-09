@@ -7,6 +7,7 @@ const Color = data_color.Color;
 
 pub const MaterialEnum = enum {
     Lambertian,
+    DiffuseLight,
     Phong,
 };
 
@@ -34,13 +35,29 @@ pub const AovStandardEnum = enum {
     Indirect,
 };
 
-pub const AovStandardNonRaytraced = [_]AovStandardEnum{ .Albedo, .Alpha, .Depth, .Normal };
+pub const LightDecayMode = enum {
+    NoDecay,
+    Quadratic,
+};
+
+pub const AovStandardNonRaytraced = [_]AovStandardEnum{
+    .Albedo,
+    .Alpha,
+    .Depth,
+    .Normal,
+};
 
 pub const Material = union(MaterialEnum) {
     Lambertian: struct {
         base: f32 = 0.7,
         base_color: Color = data_color.COLOR_GREY,
         ambiant: f32 = 0.05,
+    },
+    DiffuseLight: struct {
+        intensity: f32 = 0.7,
+        exposition: f32 = 0,
+        color: Color = data_color.COLOR_GREY,
+        decay_mode: LightDecayMode = LightDecayMode.NoDecay,
     },
     Phong: struct {},
 };

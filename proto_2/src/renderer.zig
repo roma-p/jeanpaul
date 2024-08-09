@@ -312,22 +312,9 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
 
     if (hit.does_hit == 0) return;
 
-    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
+    pixel_payload.ray_total_length = hit.t;
 
-    //  -- if only hit environment, compute beauty and return. ---------------
-    switch (hit.handle_hittable) {
-        .HandleEnv => {
-            pixel_payload.add_sample_to_aov(
-                AovStandardEnum.Beauty,
-                switch (ptr_mat.*) {
-                    definitions.MaterialEnum.Lambertian => |v| v.base_color,
-                    inline else => unreachable,
-                },
-            );
-            return;
-        },
-        inline else => {},
-    }
+    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
 
     // -- write AOV that only depends on primary rays ------------------------
 
@@ -351,19 +338,28 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
     pixel_payload.add_sample_to_aov(
         AovStandardEnum.Albedo,
         switch (ptr_mat.*) {
-            definitions.MaterialEnum.Lambertian => |v| v.base_color,
-            inline else => unreachable,
+            .Lambertian => |v| v.base_color,
+            .DiffuseLight => |v| v.color,
+            else => unreachable,
         },
     );
 
     // -- doing the ray tracing ----------------------------------------------
 
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_WHITE);
+
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Direct, data_color.COLOR_BlACK);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Indirect, data_color.COLOR_BlACK);
     try self.render_ray_trace(thread_idx, 0, hit);
     pixel_payload.dump_buffer_to_aov();
 }
 
-fn render_ray_trace(self: *Renderer, thread_idx: usize, bounce_idx: u8, hit: ControllereObject.HitRecord) !void {
+fn render_ray_trace(
+    self: *Renderer,
+    thread_idx: usize,
+    bounce_idx: u8,
+    hit: ControllereObject.HitRecord,
+) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
     var pixel_payload = &render_data_per_thread.pixel_payload;
 
@@ -371,6 +367,26 @@ fn render_ray_trace(self: *Renderer, thread_idx: usize, bounce_idx: u8, hit: Con
     var controller_material = &self.controller_scene.controller_material;
 
     const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
+
+    switch (ptr_mat.*) {
+        .DiffuseLight => |m| {
+            const emitted_color = utils_materials.get_emitted_color(
+                m.color,
+                m.intensity,
+                m.exposition,
+                m.decay_mode,
+                pixel_payload.ray_total_length,
+            );
+            pixel_payload.product_aov_buffer_value(
+                AovStandardEnum.Beauty,
+                emitted_color,
+            );
+            const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
+            pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
+            return;
+        },
+        inline else => {},
+    }
 
     const scatter_result = try switch (ptr_mat.*) {
         .Lambertian => |v| utils_materials.scatter_lambertian(
@@ -382,15 +398,23 @@ fn render_ray_trace(self: *Renderer, thread_idx: usize, bounce_idx: u8, hit: Con
             &render_data_per_thread.rnd,
         ),
         .Phong => unreachable,
+        .DiffuseLight => unreachable,
     };
+
     pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
 
     switch (hit.handle_hittable) {
-        .HandleEnv => return,
+        .HandleEnv => {
+            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+            return;
+        },
         inline else => {},
     }
 
-    if (bounce_idx == self.render_info.bounces) return;
+    if (bounce_idx == self.render_info.bounces) {
+        pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+        return;
+    }
 
     const new_hit = controller_object.send_ray_on_hittable(
         scatter_result.ray_direction,
@@ -401,6 +425,8 @@ fn render_ray_trace(self: *Renderer, thread_idx: usize, bounce_idx: u8, hit: Con
         pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
         return;
     }
+
+    pixel_payload.ray_total_length += new_hit.t;
 
     try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
 }
