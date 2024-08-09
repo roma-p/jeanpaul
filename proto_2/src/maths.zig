@@ -8,14 +8,14 @@ const constants = @import("constants.zig");
 /// if two smaller solution first.
 pub fn solve_quadratic(a: f32, b: f32, c: f32) !struct { u2, f32, f32 } {
     const discr: f64 = @as(f64, b) * @as(f64, b) - 4 * @as(f64, a) * @as(f64, c);
-    if (discr < 0) { // FIXME: 0 or EPSILON?
+    if (discr < 0) {
         return .{ 0, 0, 0 };
     } else if (discr == 0) {
         const ret: f32 = -0.5 * b / a;
         return .{ 1, ret, 0 };
     } else {
         var q: f64 = undefined;
-        if (b > 0) { // FIXME: 0 or EPSILON?
+        if (b > 0) {
             q = -0.5 * (b + @sqrt(discr));
         } else {
             q = -0.5 * (b - @sqrt(discr));

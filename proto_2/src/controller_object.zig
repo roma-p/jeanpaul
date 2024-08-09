@@ -371,8 +371,7 @@ pub fn send_ray_on_env(
             ray_origin,
             i,
         );
-        // TODO fix me.
-        // if (hit_result.hit == 0 or hit_result.t < constants.EPSILON) continue;term
+        if (hit_result.hit == 0 or hit_result.t < constants.EPSILON) continue;
         if (buffer_t == 0 or hit_result.t < buffer_t) {
             buffer_t = hit_result.t;
             buffer_env_idx = i;

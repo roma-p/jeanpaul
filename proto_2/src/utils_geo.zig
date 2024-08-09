@@ -59,15 +59,24 @@ pub fn check_ray_hit_implicit_sphere(
 
     switch (solution_number) {
         0 => return .{ .hit = 0, .t = 0 },
-        1 => {},
-        2 => {},
+        1 => {
+            if (solution.@"1" < 0) {
+                return .{ .hit = 0, .t = 0 };
+            } else {
+                return .{ .hit = 1, .t = solution.@"1" };
+            }
+        },
+        2 => {
+            // assuming smaller solution is always on field 1.
+            if (solution.@"1" > 0) {
+                return .{ .hit = 1, .t = solution.@"1" };
+            } else if (solution.@"2" > 0) {
+                return .{ .hit = 1, .t = solution.@"2" };
+            } else {
+                return .{ .hit = 0, .t = 0 };
+            }
+        },
         inline else => unreachable,
-    }
-    const t = solution.@"1"; // assuming smaller solution is always on field 1.
-    if (t > 0) { // TODO: EPSILON
-        return .{ .hit = 1, .t = solution.@"1" };
-    } else {
-        return .{ .hit = 0, .t = 0 };
     }
 }
 
@@ -92,7 +101,7 @@ pub fn check_ray_hit_implicit_plane(
     const denominator = ray_direction.product_dot(plane_normal);
 
     // TODO: use "almost equal".
-    if (denominator < EPSILON and denominator > -1 * EPSILON) { // absolute!
+    if (denominator == 0) { // absolute!
         return .{ .hit = 0, .t = 0 };
     }
 
