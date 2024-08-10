@@ -45,6 +45,7 @@ pub const RenderInfo = struct {
             tile_x_number: u16,
             tile_y_number: u16,
         },
+        SingleThread: struct {},
     };
 
     pub fn create_from_scene(controller_scene: *ControllereScene, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !RenderInfo {
@@ -126,6 +127,7 @@ pub const RenderInfo = struct {
                 },
                 data_render_settings.RenderType.Scanline => unreachable,
                 data_render_settings.RenderType.Pixel => unreachable,
+                data_render_settings.RenderType.SingleThread => .{ .SingleThread = .{} },
             },
         };
     }

@@ -97,6 +97,7 @@ const RenderDataShared = struct {
             tile_already_rendered: u16,
             tile_number: u16,
         },
+        SingleThread: struct {},
     };
 
     const Self = @This();
@@ -115,15 +116,16 @@ const RenderDataShared = struct {
             .last_percent_display_time = 0,
             .pixel_total_nb = px_number_ret.@"0",
             .data_per_render_type = switch (render_info.data_per_render_type) {
-                data_render_settings.RenderType.Tile => RenderDataShared.DataPerRenderType{
+                .Tile => .{
                     .Tile = .{
                         .next_tile_to_render = 0,
                         .tile_already_rendered = 0,
                         .tile_number = render_info.data_per_render_type.Tile.tile_number,
                     },
                 },
-                data_render_settings.RenderType.Scanline => unreachable,
-                data_render_settings.RenderType.Pixel => unreachable,
+                .Scanline => unreachable,
+                .Pixel => unreachable,
+                .SingleThread => .{ .SingleThread = .{} },
             },
         };
     }
@@ -198,6 +200,7 @@ pub fn render(
 
     switch (self.render_info.render_type) {
         data_render_settings.RenderType.Tile => try render_tile(self),
+        data_render_settings.RenderType.SingleThread => try render_singlethread(self),
         data_render_settings.RenderType.Scanline => unreachable,
         data_render_settings.RenderType.Pixel => unreachable,
     }
@@ -429,6 +432,24 @@ fn render_ray_trace(
     pixel_payload.ray_total_length += new_hit.t;
 
     try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+}
+
+// -- Render Type : SingleThread ---------------------------------------------
+
+fn render_singlethread(self: *Renderer) !void {
+    const render_info = self.render_info;
+
+    var _x: u16 = 0;
+    var _y: u16 = undefined;
+
+    while (_x < render_info.image_width) : (_x += 1) {
+        _y = 0;
+        while (_y < render_info.image_height) : (_y += 1) {
+            try self.render_single_px(_x, _y, 0);
+            self.render_shared_data.add_rendered_pixel_number(1);
+            self.render_shared_data.update_progress();
+        }
+    }
 }
 
 // -- Render Type : Tile -----------------------------------------------------

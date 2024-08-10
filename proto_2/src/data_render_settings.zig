@@ -12,6 +12,7 @@ pub const RenderType = enum {
     Pixel,
     Scanline,
     Tile,
+    SingleThread,
 };
 
 pub const ColorSpace = enum {
