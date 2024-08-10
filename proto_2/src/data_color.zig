@@ -94,6 +94,9 @@ pub fn cast_jp_color_to_u8(color_value: f32) u8 {
         calibrated_value = 0;
     }
     calibrated_value = calibrated_value * 255;
+
+    if (std.math.isNan(calibrated_value)) calibrated_value = 0;
+
     calibrated_value = @round(calibrated_value);
     const as_int: i32 = @intFromFloat(calibrated_value);
     const as_u8: u8 = @intCast(as_int);
