@@ -81,6 +81,7 @@ pub const PixelPayload = struct {
         aov_standard: AovStandardEnum,
         color: data_color.Color,
     ) void {
+        if (!self.check_has_aov(aov_standard)) return;
         const aov_ptr = self.aov_to_color_buffer.getPtr(aov_standard);
         aov_ptr.?.* = color;
     }
@@ -90,6 +91,8 @@ pub const PixelPayload = struct {
         in_aov_standard: AovStandardEnum,
         out_aov_standard: AovStandardEnum,
     ) void {
+        if (!self.check_has_aov(in_aov_standard)) return;
+        if (!self.check_has_aov(out_aov_standard)) return;
         const in_aov_ptr = self.aov_to_color_buffer.getPtr(in_aov_standard);
         const out_aov_ptr = self.aov_to_color_buffer.getPtr(out_aov_standard);
         out_aov_ptr.?.* = in_aov_ptr.?.*;

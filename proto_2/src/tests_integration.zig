@@ -1,4 +1,5 @@
 const definitions = @import("definitions.zig");
+const data_render_settings = @import("data_render_settings.zig");
 
 const Material = definitions.Material;
 const Shape = definitions.Shape;
@@ -29,15 +30,10 @@ test "prepare_render" {
 
     // -- MATERIAL --
 
-    _ = try controller_mat.add_material(
-        "red",
-        Material{ .Lambertian = .{ .base_color = data_color.COLOR_RED } },
+    const handle_mat_red_metal = try controller_mat.add_material(
+        "red_metal",
+        Material{ .Metal = .{ .base_color = data_color.Color{ .r = 1, .g = 0.3, .b = 0.4 } } },
     );
-
-    // const handle_mat_lambert_blue = try controller_mat.add_material(
-    //     "light_blue",
-    //     Material{ .Lambertian = .{ .base_color = data_color.Color{ .r = 0.5, .g = 0.7, .b = 1 }, .base = 1 } },
-    // );
 
     const handle_mat_sky = try controller_mat.add_material(
         "blue_sky",
@@ -49,7 +45,7 @@ test "prepare_render" {
         Material{ .DiffuseLight = .{
             .color = data_color.Color{ .r = 0.5, .g = 0.7, .b = 1 },
             .intensity = 50,
-            .exposition = 4,
+            .exposition = 2,
             .decay_mode = definitions.LightDecayMode.Quadratic,
         } },
     );
@@ -88,8 +84,14 @@ test "prepare_render" {
     _ = try controller_object.add_shape(
         "sphere_2",
         Shape{ .ImplicitSphere = .{ .radius = 5 } },
-        TMatrix.create_at_position(Vec3f32{ .x = -12, .y = 7, .z = 4 }),
+        TMatrix.create_at_position(Vec3f32{ .x = -12, .y = 0, .z = 4 }),
         handle_mat_light_ball,
+    );
+    _ = try controller_object.add_shape(
+        "sphere_3",
+        Shape{ .ImplicitSphere = .{ .radius = 5 } },
+        TMatrix.create_at_position(Vec3f32{ .x = 12, .y = 0, .z = 4 }),
+        handle_mat_red_metal,
     );
 
     const handle_cam: data_handles.HandleCamera = try controller_object.add_camera(
@@ -101,8 +103,10 @@ test "prepare_render" {
     controller_scene.render_settings.width = 1920;
     controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 7;
+    controller_scene.render_settings.samples = 6;
     controller_scene.render_settings.bounces = 200;
+    controller_scene.render_settings.render_type = data_render_settings.RenderType.Tile;
+    controller_scene.render_settings.color_space = data_render_settings.ColorSpace.DefaultGamma2;
 
     try controller_aov.add_aov_standard(AovStandard.Beauty);
     try controller_aov.add_aov_standard(AovStandard.Alpha);

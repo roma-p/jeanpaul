@@ -24,10 +24,38 @@ pub fn scatter_lambertian(
     ambiant: f32,
     rng: *RndGen,
 ) !ScatterResult {
-    const direction = utils_geo.gen_vec_random_spheric_normalized(rng).sum_vector(normal);
+    var direction = utils_geo.gen_vec_random_spheric_normalized(rng).sum_vector(normal);
+    if (direction.almsot_null()) {
+        direction = normal;
+    }
     // const direction = utils_geo.gen_vec_random_hemisphere_normalized(normal, rng);
     const tmp = base_color.product(intensity); //sum_with_float(ambiant * -1);
     const att = tmp.sum_with_float(ambiant * -1);
+    return ScatterResult{
+        .is_scatterred = 1,
+        .ray_origin = p,
+        .ray_direction = direction,
+        .attenuation = att,
+    };
+}
+
+pub fn scatter_metal(
+    p: Vecf32,
+    ray_direction: Vecf32,
+    normal: Vecf32,
+    base_color: Color,
+    intensity: f32,
+    ambiant: f32,
+    rng: *RndGen,
+) !ScatterResult {
+    _ = rng;
+
+    const a = 2 * ray_direction.product_dot(normal);
+    const direction = ray_direction.substract_vector(normal.product(a)).normalize();
+
+    const tmp = base_color.product(intensity); //sum_with_float(ambiant * -1);
+    const att = tmp.sum_with_float(ambiant * -1);
+
     return ScatterResult{
         .is_scatterred = 1,
         .ray_origin = p,

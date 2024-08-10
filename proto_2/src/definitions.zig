@@ -8,6 +8,7 @@ const Color = data_color.Color;
 pub const MaterialEnum = enum {
     Lambertian,
     DiffuseLight,
+    Metal,
     Phong,
 };
 
@@ -58,6 +59,11 @@ pub const Material = union(MaterialEnum) {
         exposition: f32 = 0,
         color: Color = data_color.COLOR_GREY,
         decay_mode: LightDecayMode = LightDecayMode.NoDecay,
+    },
+    Metal: struct {
+        base: f32 = 0.7,
+        base_color: Color = data_color.COLOR_GREY,
+        ambiant: f32 = 0.05,
     },
     Phong: struct {},
 };

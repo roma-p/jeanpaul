@@ -343,6 +343,7 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
         switch (ptr_mat.*) {
             .Lambertian => |v| v.base_color,
             .DiffuseLight => |v| v.color,
+            .Metal => |v| v.base_color,
             else => unreachable,
         },
     );
@@ -350,9 +351,9 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
     // -- doing the ray tracing ----------------------------------------------
 
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_WHITE);
-
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Direct, data_color.COLOR_BlACK);
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Indirect, data_color.COLOR_BlACK);
+
     try self.render_ray_trace(thread_idx, 0, hit);
     pixel_payload.dump_buffer_to_aov();
 }
@@ -394,6 +395,15 @@ fn render_ray_trace(
     const scatter_result = try switch (ptr_mat.*) {
         .Lambertian => |v| utils_materials.scatter_lambertian(
             hit.p,
+            hit.n,
+            v.base_color,
+            v.base,
+            v.ambiant,
+            &render_data_per_thread.rnd,
+        ),
+        .Metal => |v| utils_materials.scatter_metal(
+            hit.p,
+            hit.ray_direction,
             hit.n,
             v.base_color,
             v.base,

@@ -82,6 +82,7 @@ pub const ObjectPointerEnum = union(data_handles.HandleObjectAllEnum) {
 pub const HitRecord = struct {
     does_hit: u1 = 0, // 0: false, 1: true
     face_side: u1 = 0, // 0: front side, 1: back side.
+    ray_direction: Vec3f32 = maths_vec.Vec3f32.create_origin(),
     p: Vec3f32 = maths_vec.Vec3f32.create_origin(), // hit point position.
     t: f32 = 0, // ray distance.
     n: Vec3f32 = maths_vec.Vec3f32.create_origin(), // normal
@@ -347,6 +348,7 @@ pub fn send_ray_on_shapes(
     return HitRecord{
         .does_hit = 1,
         .face_side = normal_info.face_side,
+        .ray_direction = ray_direction,
         .p = p,
         .t = buffer_t,
         .n = normal_info.normal,
@@ -392,6 +394,7 @@ pub fn send_ray_on_env(
     return HitRecord{
         .does_hit = 1,
         .face_side = normal_info.face_side,
+        .ray_direction = ray_direction,
         .p = p,
         .t = buffer_t,
         .n = normal_info.normal,

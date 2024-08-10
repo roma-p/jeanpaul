@@ -87,6 +87,10 @@ pub const Vec3f32 = struct {
         };
     }
 
+    pub fn almsot_null(self: Self) bool {
+        return (@abs(self.x) < constants.EPSILON and @abs(self.y) < constants.EPSILON and @abs(self.z) < constants.EPSILON);
+    }
+
     pub fn compute_length(self: Self) f32 {
         return @sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
     }
