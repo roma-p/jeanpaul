@@ -19,6 +19,7 @@ const TMatrix = maths_tmat.TMatrix;
 const data_handles = @import("data_handle.zig");
 
 const utils_geo = @import("utils_geo.zig");
+const ControllerObjectBVH = @import("controller_object_bvh.zig");
 
 pub const ControllerObject = @This();
 
@@ -69,14 +70,6 @@ pub const ShapeEntity = struct {
 pub const EnvironmentEntity = struct {
     data: Environment,
     handle_name: data_handles.HandleObjectName,
-};
-
-pub const ObjectPointerEnum = union(data_handles.HandleObjectAllEnum) {
-    HandleCamera: *const CameraEntity,
-    HandleShape: *const ShapeEntity,
-    HandleEnv: *const EnvironmentEntity,
-    HandleObjectName: *const []u8,
-    HandleTMatrix: *const TMatrix,
 };
 
 pub const HitRecord = struct {

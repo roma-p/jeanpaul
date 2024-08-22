@@ -295,6 +295,10 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
 
     const render_info = self.render_info;
 
+    const calculate_time: bool = pixel_payload.check_has_aov(AovStandardEnum.DebugTimePerPixel);
+    var time_start: i64 = undefined;
+    if (calculate_time) time_start = std.time.timestamp();
+
     const ray_direction = utils_camera.get_ray_direction_from_focal_plane(
         render_info.camera_position,
         render_info.focal_plane_center,
@@ -356,6 +360,22 @@ fn render_single_px_single_sample(self: *Renderer, x: u16, y: u16, thread_idx: u
 
     try self.render_ray_trace(thread_idx, 0, hit);
     pixel_payload.dump_buffer_to_aov();
+
+    const c = pixel_payload.get_aov_value(AovStandardEnum.Beauty).?;
+    if (std.math.isNan(c.r) or std.math.isNan(c.g) or std.math.isNan(c.b)) {
+        std.debug.print("\n ouiiii \n", .{});
+        pixel_payload.set_aov(AovStandardEnum.DebugCheeseNan, data_color.COLOR_WHITE);
+    }
+
+    if (calculate_time) {
+        const time_end = std.time.timestamp();
+        const elapsed: i64 = time_end - time_start;
+        const elapsed_as_f32: f32 = @as(f32, @floatFromInt(elapsed));
+        pixel_payload.set_aov_buffer_value(
+            AovStandardEnum.DebugTimePerPixel,
+            data_color.Color.create_from_value_not_clamped(elapsed_as_f32),
+        );
+    }
 }
 
 fn render_ray_trace(
@@ -408,11 +428,17 @@ fn render_ray_trace(
             v.base_color,
             v.base,
             v.ambiant,
+            v.fuzz,
             &render_data_per_thread.rnd,
         ),
         .Phong => unreachable,
         .DiffuseLight => unreachable,
     };
+
+    if (hit.does_hit == 0) {
+        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+        return;
+    }
 
     pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
 

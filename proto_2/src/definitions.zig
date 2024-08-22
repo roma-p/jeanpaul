@@ -34,11 +34,8 @@ pub const AovStandardEnum = enum {
     Normal,
     Direct,
     Indirect,
-};
-
-pub const LightDecayMode = enum {
-    NoDecay,
-    Quadratic,
+    DebugCheeseNan,
+    DebugTimePerPixel,
 };
 
 pub const AovStandardNonRaytraced = [_]AovStandardEnum{
@@ -46,8 +43,14 @@ pub const AovStandardNonRaytraced = [_]AovStandardEnum{
     .Alpha,
     .Depth,
     .Normal,
+    .DebugCheeseNan,
+    .DebugTimePerPixel,
 };
 
+pub const LightDecayMode = enum {
+    NoDecay,
+    Quadratic,
+};
 pub const Material = union(MaterialEnum) {
     Lambertian: struct {
         base: f32 = 0.7,
@@ -64,6 +67,7 @@ pub const Material = union(MaterialEnum) {
         base: f32 = 0.7,
         base_color: Color = data_color.COLOR_GREY,
         ambiant: f32 = 0.05,
+        fuzz: f32 = 0,
     },
     Phong: struct {},
 };

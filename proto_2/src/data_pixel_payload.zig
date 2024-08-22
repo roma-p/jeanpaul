@@ -61,9 +61,19 @@ pub const PixelPayload = struct {
         value: data_color.Color,
     ) void {
         if (!self.check_has_aov(aov_standard)) return;
-        const aov_ptr = self.aov_to_color.getPtr(aov_standard); // TODO: check for key existence....
+        const aov_ptr = self.aov_to_color.getPtr(aov_standard);
         const sampled_value = value.product(self.sample_nbr_invert);
         aov_ptr.?.* = aov_ptr.?.sum_color(sampled_value);
+    }
+
+    pub fn set_aov(
+        self: *Self,
+        aov_standard: AovStandardEnum,
+        value: data_color.Color,
+    ) void {
+        if (!self.check_has_aov(aov_standard)) return;
+        const aov_ptr = self.aov_to_color.getPtr(aov_standard);
+        aov_ptr.?.* = value;
     }
 
     pub fn check_has_aov(self: *Self, aov_standard: AovStandardEnum) bool {
@@ -111,6 +121,15 @@ pub const PixelPayload = struct {
         var it = self.aov_to_color_buffer.iterator();
         while (it.next()) |item| {
             self.add_sample_to_aov(item.key_ptr.*, item.value_ptr.*);
+        }
+    }
+
+    pub fn get_aov_value(self: *Self, aov_standard: AovStandardEnum) ?data_color.Color {
+        const v = self.aov_to_color.get(aov_standard);
+        if (v == null) {
+            return null;
+        } else {
+            return v.?;
         }
     }
 };

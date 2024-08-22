@@ -11,6 +11,8 @@ pub fn Vec2(comptime T: type) type {
 
 pub const Vec2u16 = Vec2(u16);
 
+pub const Axis = enum { x, y, z };
+
 pub const Vec3f32 = struct {
     x: f32 = undefined,
     y: f32 = undefined,

@@ -3,10 +3,12 @@ const constants = @import("constants.zig");
 const maths = @import("maths.zig");
 const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
+const maths_bbox = @import("maths_bbox.zig");
 
 const Vec3f32 = maths_vec.Vec3f32;
 const TMatrix = maths_tmat.TMatrix;
 const RndGen = std.rand.DefaultPrng;
+const BoundingBox = maths_bbox.BoundingBox;
 
 const EPSILON = constants.EPSILON;
 
@@ -150,4 +152,26 @@ pub fn gen_vec_random_spheric_normalized(rng: *RndGen) Vec3f32 {
     };
     ret = ret.normalize();
     return ret;
+}
+
+// -- BOUNDING BOX --
+
+pub fn gen_bbox_implicit_sphere(pos: Vec3f32, radius: f32) BoundingBox {
+    const half_radius = radius / 2;
+    return BoundingBox{
+        .x_min = pos.x - half_radius,
+        .x_max = pos.x + half_radius,
+        .y_min = pos.y - half_radius,
+        .y_max = pos.y + half_radius,
+        .z_min = pos.z - half_radius,
+        .z_max = pos.z + half_radius,
+    };
+}
+
+pub fn get_bounding_box_center(bouding_box: BoundingBox) Vec3f32 {
+    return Vec3f32{
+        .x = (bouding_box.x_max + bouding_box.x_min) / 2 + bouding_box.x_min,
+        .y = (bouding_box.y_max + bouding_box.y_min) / 2 + bouding_box.y_min,
+        .z = (bouding_box.z_max + bouding_box.z_min) / 2 + bouding_box.z_min,
+    };
 }

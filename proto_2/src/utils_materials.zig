@@ -46,18 +46,26 @@ pub fn scatter_metal(
     base_color: Color,
     intensity: f32,
     ambiant: f32,
+    fuzz: f32,
     rng: *RndGen,
 ) !ScatterResult {
-    _ = rng;
-
     const a = 2 * ray_direction.product_dot(normal);
-    const direction = ray_direction.substract_vector(normal.product(a)).normalize();
+    var direction = ray_direction.substract_vector(normal.product(a)).normalize();
+    const fuzz_alteration = utils_geo.gen_vec_random_spheric_normalized(rng).product(fuzz);
+    direction = direction.sum_vector(fuzz_alteration);
 
     const tmp = base_color.product(intensity); //sum_with_float(ambiant * -1);
     const att = tmp.sum_with_float(ambiant * -1);
 
+    var is_scattered: u1 = undefined;
+    if (direction.product_dot(normal) < 0) {
+        is_scattered = 1;
+    } else {
+        is_scattered = 0;
+    }
+
     return ScatterResult{
-        .is_scatterred = 1,
+        .is_scatterred = is_scattered,
         .ray_origin = p,
         .ray_direction = direction,
         .attenuation = att,
