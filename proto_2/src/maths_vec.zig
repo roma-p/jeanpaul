@@ -48,6 +48,14 @@ pub const Vec3f32 = struct {
         return Self.create_z().product(-1);
     }
 
+    pub fn get_by_axis(self: Self, axis: Axis) f32 {
+        switch (axis) {
+            .x => return self.x,
+            .y => return self.y,
+            .z => return self.z,
+        }
+    }
+
     pub fn check_is_equal(self: Self, vec: Vec3f32) bool {
         return (self.x == vec.x and self.y == vec.y and self.z == vec.z);
     }

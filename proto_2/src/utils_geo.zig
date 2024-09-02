@@ -5,10 +5,14 @@ const maths_vec = @import("maths_vec.zig");
 const maths_tmat = @import("maths_tmat.zig");
 const maths_bbox = @import("maths_bbox.zig");
 
+const maths_ray = @import("maths_ray.zig");
+
 const Vec3f32 = maths_vec.Vec3f32;
 const TMatrix = maths_tmat.TMatrix;
 const RndGen = std.rand.DefaultPrng;
 const BoundingBox = maths_bbox.BoundingBox;
+const Ray = maths_ray.Ray;
+const Axis = maths_vec.Axis;
 
 const EPSILON = constants.EPSILON;
 
@@ -34,8 +38,7 @@ pub fn get_normal_on_skydome(point_pos: Vec3f32) Vec3f32 {
 // -- COLLISION --
 
 pub fn check_ray_hit_implicit_sphere(
-    ray_direction: maths_vec.Vec3f32,
-    ray_origin: maths_vec.Vec3f32,
+    ray: Ray,
     sphere_position: maths_vec.Vec3f32,
     sphere_radius: f32,
 ) !HitResult {
@@ -49,11 +52,11 @@ pub fn check_ray_hit_implicit_sphere(
     //   b = 2 * ray_direction * (ray_origin - sphere_position)
     //   c = (ray_origin - sphere_position) ^2 - r^2
 
-    const L = ray_origin.substract_vector(sphere_position);
+    const L = ray.o.substract_vector(sphere_position);
     // from ray origin to sphere center
 
-    const a: f32 = ray_direction.product_dot(ray_direction);
-    const b: f32 = 2 * (ray_direction.product_dot(L));
+    const a: f32 = ray.d.product_dot(ray.d);
+    const b: f32 = 2 * (ray.d.product_dot(L));
     const c: f32 = L.product_dot(L) - (sphere_radius * sphere_radius);
 
     const solution = try maths.solve_quadratic(a, b, c);
@@ -83,8 +86,7 @@ pub fn check_ray_hit_implicit_sphere(
 }
 
 pub fn check_ray_hit_implicit_plane(
-    ray_direction: maths_vec.Vec3f32,
-    ray_origin: maths_vec.Vec3f32,
+    ray: Ray,
     plane_position: maths_vec.Vec3f32,
     plane_normal: maths_vec.Vec3f32,
 ) !HitResult {
@@ -100,14 +102,14 @@ pub fn check_ray_hit_implicit_plane(
     // no solution if ray_direction dot plane_normal == 0 (if there are colinear, no intersection)
     // we only consider t > 0.
 
-    const denominator = ray_direction.product_dot(plane_normal);
+    const denominator = ray.d.product_dot(plane_normal);
 
     // TODO: use "almost equal".
     if (denominator == 0) { // absolute!
         return .{ .hit = 0, .t = 0 };
     }
 
-    const _tmp = plane_position.substract_vector(ray_origin);
+    const _tmp = plane_position.substract_vector(ray.o);
     const numerator = _tmp.product_dot(plane_normal);
 
     const t: f32 = numerator / denominator;
@@ -117,13 +119,50 @@ pub fn check_ray_hit_implicit_plane(
     return .{ .hit = 1, .t = t };
 }
 
-pub fn check_ray_hit_skydome(ray_direction: maths_vec.Vec3f32, ray_origin: maths_vec.Vec3f32) !HitResult {
+pub fn check_ray_hit_skydome(ray: Ray) !HitResult {
     return check_ray_hit_implicit_sphere(
-        ray_direction,
-        ray_origin,
+        ray,
         maths_vec.Vec3f32.create_origin(),
         1000000,
     );
+}
+
+pub fn check_ray_hit_aabb(ray: Ray, bbox: BoundingBox) bool {
+    var axis: Axis = undefined;
+
+    var t_min: f32 = constants.EPSILON;
+    var t_max: f32 = constants.INFINITE;
+
+    var i: usize = 0;
+    const axis_arr = [3]Axis{ Axis.x, Axis.y, Axis.z };
+    while (i < 3) : (i += 1) {
+        axis = axis_arr[i];
+
+        const ray_d_at_axis = ray.d.get_by_axis(axis);
+        const ray_o_at_axis = ray.o.get_by_axis(axis);
+
+        const ray_dir_inverted = 1.0 / ray_d_at_axis;
+        // const is_dir_neg: bool = ray_d_at_axis < 0;
+
+        const bbox_min_max = bbox.get_by_axis(axis);
+
+        const local_t_min = (bbox_min_max.min - ray_o_at_axis) * ray_dir_inverted;
+        var local_t_max = (bbox_min_max.max - ray_o_at_axis) * ray_dir_inverted;
+
+        local_t_max += constants.EPSILON;
+
+        if (local_t_min < local_t_max) {
+            if (local_t_min > t_min) t_min = local_t_min;
+            if (local_t_max < t_max) t_max = local_t_max;
+        } else {
+            if (local_t_max > t_min) t_min = local_t_max;
+            if (local_t_min < t_max) t_max = local_t_min;
+        }
+
+        if (t_max - t_min < constants.EPSILON) return false;
+    }
+
+    return true;
 }
 
 // -- MISC --
@@ -157,14 +196,13 @@ pub fn gen_vec_random_spheric_normalized(rng: *RndGen) Vec3f32 {
 // -- BOUNDING BOX --
 
 pub fn gen_bbox_implicit_sphere(pos: Vec3f32, radius: f32) BoundingBox {
-    const half_radius = radius / 2;
     return BoundingBox{
-        .x_min = pos.x - half_radius,
-        .x_max = pos.x + half_radius,
-        .y_min = pos.y - half_radius,
-        .y_max = pos.y + half_radius,
-        .z_min = pos.z - half_radius,
-        .z_max = pos.z + half_radius,
+        .x_min = pos.x - radius,
+        .x_max = pos.x + radius,
+        .y_min = pos.y - radius,
+        .y_max = pos.y + radius,
+        .z_min = pos.z - radius,
+        .z_max = pos.z + radius,
     };
 }
 
@@ -174,4 +212,31 @@ pub fn get_bounding_box_center(bouding_box: BoundingBox) Vec3f32 {
         .y = (bouding_box.y_max + bouding_box.y_min) / 2 + bouding_box.y_min,
         .z = (bouding_box.z_max + bouding_box.z_min) / 2 + bouding_box.z_min,
     };
+}
+
+test "check_ray_hit_aabb" {
+    const bbox = BoundingBox.create_square_box_at_position(
+        Vec3f32.create_x(),
+        3,
+    );
+    const ray_1 = Ray{
+        .o = Vec3f32{ .x = -5, .y = 0, .z = 0 },
+        .d = Vec3f32.create_x(),
+    };
+    const ray_2 = Ray{
+        .o = Vec3f32{ .x = 5, .y = 0, .z = 0 },
+        .d = Vec3f32.create_x_neg(),
+    };
+    const ray_3 = Ray{
+        .o = Vec3f32{ .x = -5, .y = 0, .z = 0 },
+        .d = Vec3f32.create_x_neg(),
+    };
+    const ray_4 = Ray{
+        .o = Vec3f32{ .x = 0, .y = -5, .z = 0 },
+        .d = Vec3f32.create_y(),
+    };
+    try std.testing.expectEqual(true, check_ray_hit_aabb(ray_1, bbox));
+    try std.testing.expectEqual(true, check_ray_hit_aabb(ray_2, bbox));
+    try std.testing.expectEqual(false, check_ray_hit_aabb(ray_3, bbox));
+    try std.testing.expectEqual(true, check_ray_hit_aabb(ray_4, bbox));
 }

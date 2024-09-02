@@ -12,15 +12,21 @@ pub const PixelPayload = struct {
     aov_to_color: std.AutoHashMap(AovStandardEnum, data_color.Color),
     aov_to_color_buffer: std.AutoHashMap(AovStandardEnum, data_color.Color),
     sample_nbr_invert: f32,
+    sample_antialiasing_nbr_invert: f32,
     ray_total_length: f32,
 
     const Self = @This();
 
-    pub fn init(controller_aov: *ControllerAov, sample_nbr_invert: f32) !Self {
+    pub fn init(
+        controller_aov: *ControllerAov,
+        sample_nbr_invert: f32,
+        sample_antialiasing_nbr_invert: f32,
+    ) !Self {
         var ret = .{
             .aov_to_color = std.AutoHashMap(AovStandardEnum, data_color.Color).init(gpa),
             .aov_to_color_buffer = std.AutoHashMap(AovStandardEnum, data_color.Color).init(gpa),
             .sample_nbr_invert = sample_nbr_invert,
+            .sample_antialiasing_nbr_invert = sample_antialiasing_nbr_invert,
             .ray_total_length = 0,
         };
         for (controller_aov.array_aov_standard.items) |aov| {
@@ -62,7 +68,7 @@ pub const PixelPayload = struct {
     ) void {
         if (!self.check_has_aov(aov_standard)) return;
         const aov_ptr = self.aov_to_color.getPtr(aov_standard);
-        const sampled_value = value.product(self.sample_nbr_invert);
+        const sampled_value = value.product(self.sample_antialiasing_nbr_invert);
         aov_ptr.?.* = aov_ptr.?.sum_color(sampled_value);
     }
 

@@ -35,7 +35,7 @@ test "prepare_render" {
         Material{ .Metal = .{
             .base_color = data_color.Color{ .r = 1, .g = 0.3, .b = 0.4 },
             .base = 1,
-            .fuzz = 0.3,
+            .fuzz = 0.6,
         } },
     );
 
@@ -117,10 +117,12 @@ test "prepare_render" {
     controller_scene.render_settings.width = 1920;
     controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 4;
-    controller_scene.render_settings.bounces = 200;
+    controller_scene.render_settings.samples = 1;
+    controller_scene.render_settings.samples_antialiasing = 1;
+    controller_scene.render_settings.bounces = 6;
     controller_scene.render_settings.render_type = data_render_settings.RenderType.Tile;
     controller_scene.render_settings.color_space = data_render_settings.ColorSpace.DefaultGamma2;
+    controller_scene.render_settings.collision_acceleration = data_render_settings.CollisionAccelerationMethod.BvhEqualSize;
 
     try controller_aov.add_aov_standard(AovStandard.Beauty);
     try controller_aov.add_aov_standard(AovStandard.Alpha);
@@ -130,8 +132,9 @@ test "prepare_render" {
     try controller_aov.add_aov_standard(AovStandard.Direct);
     try controller_aov.add_aov_standard(AovStandard.Indirect);
     try controller_aov.add_aov_standard(AovStandard.DebugCheeseNan);
+    // try controller_aov.add_aov_standard(AovStandard.DebugTimePerPixel);
 
-    var renderer = Renderer.init(&controller_scene);
+    var renderer = try Renderer.init(&controller_scene);
     defer renderer.deinit();
 
     try renderer.render(handle_cam, "tests", "test_render_image");

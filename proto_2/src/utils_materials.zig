@@ -4,15 +4,16 @@ const definitions = @import("definitions.zig");
 const data_color = @import("data_color.zig");
 const utils_geo = @import("utils_geo.zig");
 const maths_vec = @import("maths_vec.zig");
+const maths_ray = @import("maths_ray.zig");
 
 const Color = data_color.Color;
 const Vecf32 = maths_vec.Vec3f32;
 const RndGen = std.rand.DefaultPrng;
+const Ray = maths_ray.Ray;
 
 pub const ScatterResult = struct {
     is_scatterred: u1 = 0,
-    ray_origin: Vecf32 = Vecf32.create_origin(),
-    ray_direction: Vecf32 = Vecf32.create_origin(),
+    ray: Ray = Ray.create_null(),
     attenuation: Color = data_color.COLOR_EMPTY,
 };
 
@@ -28,13 +29,14 @@ pub fn scatter_lambertian(
     if (direction.almsot_null()) {
         direction = normal;
     }
-    // const direction = utils_geo.gen_vec_random_hemisphere_normalized(normal, rng);
     const tmp = base_color.product(intensity); //sum_with_float(ambiant * -1);
     const att = tmp.sum_with_float(ambiant * -1);
     return ScatterResult{
         .is_scatterred = 1,
-        .ray_origin = p,
-        .ray_direction = direction,
+        .ray = .{
+            .o = p,
+            .d = direction,
+        },
         .attenuation = att,
     };
 }
@@ -66,8 +68,10 @@ pub fn scatter_metal(
 
     return ScatterResult{
         .is_scatterred = is_scattered,
-        .ray_origin = p,
-        .ray_direction = direction,
+        .ray = .{
+            .o = p,
+            .d = direction,
+        },
         .attenuation = att,
     };
 }

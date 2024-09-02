@@ -8,7 +8,7 @@ comptime {
     _ = @import("controller_object.zig");
     _ = @import("controller_img.zig");
     _ = @import("controller_scene.zig");
-    _ = @import("controller_object_bvh.zig");
+    _ = @import("controller_bvh.zig");
     _ = @import("renderer.zig");
     _ = @import("tests_integration.zig");
 }

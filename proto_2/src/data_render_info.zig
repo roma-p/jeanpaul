@@ -22,6 +22,7 @@ pub const RenderInfo = struct {
     image_height_f32: f32,
 
     samples: u16,
+    samples_antialiasing: u16,
     bounces: u16,
 
     render_type: data_render_settings.RenderType,
@@ -30,6 +31,9 @@ pub const RenderInfo = struct {
 
     samples_nbr: u16,
     samples_invert: f32,
+
+    samples_antialasing_nbr: u16,
+    samples_antialasing_invert: f32,
 
     camera_handle: data_handles.HandleCamera,
     camera_position: maths_vec.Vec3f32,
@@ -48,7 +52,11 @@ pub const RenderInfo = struct {
         SingleThread: struct {},
     };
 
-    pub fn create_from_scene(controller_scene: *ControllereScene, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !RenderInfo {
+    pub fn create_from_scene(
+        controller_scene: *ControllereScene,
+        camera_handle: data_handles.HandleCamera,
+        thread_nbr: usize,
+    ) !RenderInfo {
         var controller_object = controller_scene.controller_object;
         const scene_render_settings = controller_scene.render_settings;
 
@@ -98,6 +106,10 @@ pub const RenderInfo = struct {
         const sample_nbr_as_f32: f32 = @floatFromInt(sample_nbr);
         const invert_sample_nbr: f32 = 1 / sample_nbr_as_f32;
 
+        const sample_antialiasing_nbr = std.math.pow(u16, 2, scene_render_settings.samples_antialiasing);
+        const sample_antialiasing_nbr_as_f32: f32 = @floatFromInt(sample_antialiasing_nbr);
+        const invert_antialiasing_sample_nbr: f32 = 1 / sample_antialiasing_nbr_as_f32;
+
         const camera_position = ptr_cam_tmatrix.*.get_position();
 
         return .{
@@ -110,6 +122,9 @@ pub const RenderInfo = struct {
             .samples = scene_render_settings.samples,
             .samples_nbr = sample_nbr,
             .samples_invert = invert_sample_nbr,
+            .samples_antialiasing = scene_render_settings.samples_antialiasing,
+            .samples_antialasing_nbr = sample_antialiasing_nbr,
+            .samples_antialasing_invert = invert_antialiasing_sample_nbr,
             .bounces = scene_render_settings.bounces,
             .focal_plane_center = cam_focal_plane_center,
             .camera_handle = camera_handle,
