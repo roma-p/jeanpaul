@@ -2,6 +2,7 @@ const std = @import("std");
 
 const definitions = @import("definitions.zig");
 const data_color = @import("data_color.zig");
+const data_handle = @import("data_handle.zig");
 const utils_geo = @import("utils_geo.zig");
 const maths_vec = @import("maths_vec.zig");
 const maths_ray = @import("maths_ray.zig");
@@ -10,11 +11,14 @@ const Color = data_color.Color;
 const Vecf32 = maths_vec.Vec3f32;
 const RndGen = std.rand.DefaultPrng;
 const Ray = maths_ray.Ray;
+const HandleMaterial = data_handle.HandleMaterial;
 
 pub const ScatterResult = struct {
     is_scatterred: u1 = 0,
-    ray: Ray = Ray.create_null(),
+    ray_diffuse: ?Ray = null,
+    ray_specular: ?Ray = null,
     attenuation: Color = data_color.COLOR_EMPTY,
+    emission: ?Color = null,
 };
 
 pub fn scatter_lambertian(
@@ -33,11 +37,12 @@ pub fn scatter_lambertian(
     const att = tmp.sum_with_float(ambiant * -1);
     return ScatterResult{
         .is_scatterred = 1,
-        .ray = .{
+        .ray_diffuse = .{
             .o = p,
             .d = direction,
         },
         .attenuation = att,
+        .emission = null,
     };
 }
 
@@ -68,11 +73,12 @@ pub fn scatter_metal(
 
     return ScatterResult{
         .is_scatterred = is_scattered,
-        .ray = .{
+        .ray_specular = .{
             .o = p,
             .d = direction,
         },
         .attenuation = att,
+        .emission = null,
     };
 }
 
@@ -82,11 +88,14 @@ pub fn get_emitted_color(
     exposition: f32,
     decay_mode: definitions.LightDecayMode,
     ray_length: f32,
-) Color {
+) ScatterResult {
     const full_intensity = intensity * std.math.pow(f32, 2, exposition);
     const with_decay = switch (decay_mode) {
         .NoDecay => full_intensity,
         .Quadratic => full_intensity / (ray_length * ray_length),
     };
-    return color.product(with_decay);
+    return ScatterResult{
+        .is_scatterred = 0,
+        .emission = color.product(with_decay),
+    };
 }

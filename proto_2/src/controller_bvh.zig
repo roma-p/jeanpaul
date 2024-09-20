@@ -104,7 +104,9 @@ pub fn deinit(self: *ControllerBVH) void {
 }
 
 pub fn build_bvh(self: *ControllerBVH) !void {
-    self._shape_bb_array_len = try self.populate_shape_bbox_and_infinite_shape_arr_list(self.controller_object);
+    self._shape_bb_array_len = try self.populate_shape_bbox_and_infinite_shape_arr(
+        self.controller_object,
+    );
     defer self.clean_after_bhv_construction();
 
     const axis = choose_axis_to_use_for_splitting(
@@ -124,13 +126,17 @@ pub fn build_bvh(self: *ControllerBVH) !void {
         self._shape_bb_array_len,
     );
 
-    const root_build_node_idx = try populate_bvh_build_node_equal_counts(
-        &self._shape_bb_array,
-        &self._bhv_tree_build,
-        axis,
-        self.max_shape_per_node,
-        self._shape_bb_array_len,
-    );
+    const root_build_node_idx = switch (self.bvh_method) {
+        .BvhEqualSize => try build_bvh_build_tree_using_equal_size(
+            &self._shape_bb_array,
+            &self._bhv_tree_build,
+            axis,
+            self.max_shape_per_node,
+            self._shape_bb_array_len,
+        ),
+        inline else => unreachable,
+    };
+
     _ = try flatten_bvh_tree(
         &self._bhv_tree_build,
         &self._bvh_tree,
@@ -138,7 +144,7 @@ pub fn build_bvh(self: *ControllerBVH) !void {
     );
 }
 
-fn populate_shape_bbox_and_infinite_shape_arr_list(
+fn populate_shape_bbox_and_infinite_shape_arr(
     self: *ControllerBVH,
     controller_object: *ControllerObject,
 ) !usize {
@@ -239,7 +245,7 @@ fn populate_shape_idx_ordered(
     }
 }
 
-fn populate_bvh_build_node_equal_counts(
+fn build_bvh_build_tree_using_equal_size(
     bb_list: *[]ShapeBoundingBox,
     tmp_bvh_tree: *std.ArrayList(BvhBuildNode),
     axis: Axis,
@@ -247,7 +253,7 @@ fn populate_bvh_build_node_equal_counts(
     bb_list_len: usize,
 ) !usize {
     _ = axis;
-    return try create_bvh_build_node(
+    return try build_bvh_build_tree_using_equal_size_recc(
         bb_list,
         tmp_bvh_tree,
         0,
@@ -256,7 +262,7 @@ fn populate_bvh_build_node_equal_counts(
     );
 }
 
-fn create_bvh_build_node(
+fn build_bvh_build_tree_using_equal_size_recc(
     bb_list: *[]ShapeBoundingBox,
     tmp_bvh_tree: *std.ArrayList(BvhBuildNode),
     start: usize,
@@ -281,8 +287,8 @@ fn create_bvh_build_node(
     } else {
         is_leafs_shapes = 0;
         const mid = (end - start) / 2 + start;
-        lhs = try create_bvh_build_node(bb_list, tmp_bvh_tree, start, mid, max_shape_per_node);
-        rhs = try create_bvh_build_node(bb_list, tmp_bvh_tree, mid + 1, end, max_shape_per_node);
+        lhs = try build_bvh_build_tree_using_equal_size_recc(bb_list, tmp_bvh_tree, start, mid, max_shape_per_node);
+        rhs = try build_bvh_build_tree_using_equal_size_recc(bb_list, tmp_bvh_tree, mid + 1, end, max_shape_per_node);
         bbox = tmp_bvh_tree.items[lhs].bbox.expand(tmp_bvh_tree.items[rhs].bbox);
     }
 
@@ -506,7 +512,7 @@ test "equalCounts" {
     bbox_arr[1] = shape_bounding_box_2;
     bbox_arr[2] = shape_bounding_box_3;
 
-    const root_build_node_idx = try populate_bvh_build_node_equal_counts(
+    const root_build_node_idx = try build_bvh_build_tree_using_equal_size(
         &bbox_arr,
         &build_node_vec,
         Axis.x,

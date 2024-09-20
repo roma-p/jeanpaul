@@ -73,6 +73,10 @@ pub const Color = struct {
     fn _clamp(value: f32) f32 {
         return @max(@min(value, 1), 0);
     }
+
+    pub fn check_is_equal(self: Color, other: Color) bool {
+        return (self.r == other.r and self.g == other.g and self.b == other.b);
+    }
 };
 
 pub const COLOR_BlACK = Color{ .r = 0, .g = 0, .b = 0 };

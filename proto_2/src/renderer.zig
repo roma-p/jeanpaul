@@ -40,6 +40,7 @@ const RenderInfo = data_render_info.RenderInfo;
 const PixelPayload = data_pixel_payload.PixelPayload;
 const Vec3f32 = math_vec.Vec3f32;
 const Ray = maths_ray.Ray;
+const ScatterResult = utils_materials.ScatterResult;
 
 renderer_ray_collision: RendererRayCollision,
 
@@ -82,6 +83,8 @@ pub fn deinit(self: *Renderer) void {
     self.array_render_data_per_thread.deinit();
     self.array_thread.deinit();
 }
+
+const RayType = enum { Primary, Specular, Diffuse };
 
 const RenderDataPerThread = struct {
     rnd: RndGen,
@@ -366,11 +369,15 @@ fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, 
     // -- doing the ray tracing ----------------------------------------------
 
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_WHITE);
+    // TODO -> where to put contribution to white?
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Direct, data_color.COLOR_BlACK);
     pixel_payload.set_aov_buffer_value(AovStandardEnum.Indirect, data_color.COLOR_BlACK);
 
-    try self.render_ray_trace(thread_idx, 0, hit);
+    try self.render_ray_trace(thread_idx, 0, hit, RayType.Primary);
+
+    convert_shading_contribution_to_aov(pixel_payload);
     pixel_payload.dump_buffer_to_aov();
+    pixel_payload.reset_all_contributions();
 
     const c = pixel_payload.get_aov_value(AovStandardEnum.Beauty).?;
     if (std.math.isNan(c.r) or std.math.isNan(c.g) or std.math.isNan(c.b)) {
@@ -393,173 +400,204 @@ fn render_ray_trace(
     thread_idx: usize,
     bounce_idx: u8,
     hit: RendererRayCollision.HitRecord,
+    ray_type: RayType,
 ) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
     var pixel_payload = &render_data_per_thread.pixel_payload;
 
-    var controller_material = &self.controller_scene.controller_material;
+    const ContributionEnum = PixelPayload.ContributionEnum;
 
-    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
-
-    switch (ptr_mat.*) {
-        .DiffuseLight => |m| {
-            const emitted_color = utils_materials.get_emitted_color(
-                m.color,
-                m.intensity,
-                m.exposition,
-                m.decay_mode,
-                pixel_payload.ray_total_length,
-            );
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, emitted_color);
-            const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
-            pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
-            return;
-        },
-        inline else => {},
-    }
-
-    const scatter_result = try switch (ptr_mat.*) {
-        .Lambertian => |v| utils_materials.scatter_lambertian(
-            hit.p,
-            hit.n,
-            v.base_color,
-            v.base,
-            v.ambiant,
-            &render_data_per_thread.rnd,
-        ),
-        .Metal => |v| utils_materials.scatter_metal(
-            hit.p,
-            hit.ray_direction,
-            hit.n,
-            v.base_color,
-            v.base,
-            v.ambiant,
-            v.fuzz,
-            &render_data_per_thread.rnd,
-        ),
-        .Phong => unreachable,
-        .DiffuseLight => unreachable,
+    const contribution: ContributionEnum = switch (ray_type) {
+        .Primary => ContributionEnum.Emission,
+        .Specular => if (bounce_idx < 2) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
+        .Diffuse => if (bounce_idx < 2) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
     };
 
-    if (hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+    const scatter_result = try self.scatter(
+        hit.p,
+        hit.ray_direction,
+        hit.n,
+        &render_data_per_thread.rnd,
+        hit.handle_mat,
+        pixel_payload.ray_total_length,
+    );
+
+    // -- handling emission / lights --
+    if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
+
+        // pixel_payload.product_aov_buffer_value(
+        //     AovStandardEnum.Beauty,
+        //     scatter_result.emission.?,
+        // );
+
+        pixel_payload.add_contribution(contribution, scatter_result.emission.?);
+
+        // const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
+        // pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
+
+        // -> TODO: dump buffer!
         return;
     }
 
-    pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
+    if (hit.does_hit == 0) {
+        pixel_payload.reset_contribution(contribution);
+        // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
+        return;
+    }
 
+    // pixel_payload.add_contribution(contribution, scatter_result.attenuation);
+    // pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
+
+    // -- handling end cases --
     switch (hit.handle_hittable) {
         .HandleEnv => {
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+            pixel_payload.reset_contribution(contribution);
+            // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
             return;
         },
         inline else => {},
     }
-
     if (bounce_idx == self.render_info.bounces) {
-        pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+        pixel_payload.reset_contribution(contribution);
+        // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
         return;
     }
 
-    const new_hit = self.renderer_ray_collision.send_ray_on_hittable(
-        scatter_result.ray,
-    );
+    // -- propagating child rays --
+    var hit_something: bool = false;
 
-    if (new_hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
+    // !! SO INDIRECT: multiply with direct value and continue its "propagation"
+    // !! multiply the indirect value, directly copy from direct.
+    // !! then substract the direct value from the indirect value... and you got valid indirect value.
+
+    // -- * diffuse --
+    if (scatter_result.ray_diffuse != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
+        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            if (bounce_idx < 2) {
+                pixel_payload.add_contribution(ContributionEnum.DiffuseDirect, scatter_result.attenuation);
+            } else {
+                pixel_payload.add_contribution(ContributionEnum.DiffuseIndirect, scatter_result.attenuation);
+            }
+            hit_something = true;
+            const new_ray_type = switch (ray_type) {
+                .Primary => RayType.Diffuse,
+                inline else => ray_type,
+            };
+            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit, new_ray_type);
+        }
     }
 
-    pixel_payload.ray_total_length += new_hit.t;
+    // -- * specular --
+    if (scatter_result.ray_specular != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
+        pixel_payload.ray_total_length += new_hit.t;
+        if (new_hit.does_hit == 1) {
+            if (bounce_idx < 2) {
+                pixel_payload.add_contribution(ContributionEnum.SpecularDirect, scatter_result.attenuation);
+            } else {
+                pixel_payload.add_contribution(ContributionEnum.SpecularIndirect, scatter_result.attenuation);
+            }
+            hit_something = true;
+            const new_ray_type = switch (ray_type) {
+                .Primary => RayType.Specular,
+                inline else => ray_type,
+            };
+            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit, new_ray_type);
+        }
+    }
 
-    try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+    if (!hit_something) {
+        pixel_payload.reset_contribution(contribution);
+        // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
+        return;
+    }
 }
 
-fn render_ray_trace_single_sample(
+pub fn convert_shading_contribution_to_aov(pixel_payload: *PixelPayload) void {
+    const ContributionEnum = PixelPayload.ContributionEnum;
+    const contribution_emission = pixel_payload.get_contribution(ContributionEnum.Emission);
+    const contribution_diffuse_direct = pixel_payload.get_contribution(ContributionEnum.DiffuseDirect);
+    const contribution_diffuse_indirect = pixel_payload.get_contribution(ContributionEnum.DiffuseIndirect);
+    const contribution_specular_direct = pixel_payload.get_contribution(ContributionEnum.SpecularDirect);
+    const contribution_specular_indirect = pixel_payload.get_contribution(ContributionEnum.SpecularIndirect);
+
+    var beauty = data_color.COLOR_BlACK;
+
+    beauty.sum_to_color(contribution_emission);
+    beauty.sum_to_color(contribution_diffuse_direct);
+    beauty.sum_to_color(contribution_diffuse_indirect);
+    beauty.sum_to_color(contribution_specular_direct);
+    beauty.sum_to_color(contribution_specular_indirect);
+
+    var direct = data_color.COLOR_BlACK;
+    direct.sum_to_color(contribution_emission);
+    direct.sum_to_color(contribution_diffuse_direct);
+    direct.sum_to_color(contribution_specular_direct);
+
+    var indirect = data_color.COLOR_BlACK;
+    indirect.sum_to_color(contribution_diffuse_indirect);
+    indirect.sum_to_color(contribution_specular_indirect);
+
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, beauty);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Direct, direct);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Indirect, indirect);
+    pixel_payload.set_aov_buffer_value(
+        AovStandardEnum.Diffuse,
+        contribution_diffuse_direct.sum_color(contribution_diffuse_indirect),
+    );
+    pixel_payload.set_aov_buffer_value(
+        AovStandardEnum.Specular,
+        contribution_specular_direct.sum_color(contribution_specular_indirect),
+    );
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.Emission, contribution_emission);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.DiffuseDirect, contribution_diffuse_direct);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.DiffuseIndirect, contribution_diffuse_indirect);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.SpecularDirect, contribution_specular_direct);
+    pixel_payload.set_aov_buffer_value(AovStandardEnum.SpecularIndirect, contribution_specular_indirect);
+}
+
+pub fn scatter(
     self: *Renderer,
-    thread_idx: usize,
-    bounce_idx: u8,
-    hit: RendererRayCollision.HitRecord,
-) !void {
-    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.pixel_payload;
+    p: Vec3f32,
+    ray_direction: Vec3f32,
+    normal: Vec3f32,
+    rng: *RndGen,
+    handle_mat: data_handles.HandleMaterial,
+    ray_total_length: f32,
+) !ScatterResult {
+    const controller_material = &self.controller_scene.controller_material;
+    const ptr_mat = try controller_material.get_mat_pointer(handle_mat);
 
-    var controller_material = &self.controller_scene.controller_material;
-
-    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
-
-    switch (ptr_mat.*) {
-        .DiffuseLight => |m| {
-            const emitted_color = utils_materials.get_emitted_color(
-                m.color,
-                m.intensity,
-                m.exposition,
-                m.decay_mode,
-                pixel_payload.ray_total_length,
-            );
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, emitted_color);
-            const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
-            pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
-            return;
-        },
-        inline else => {},
-    }
-
-    const scatter_result = try switch (ptr_mat.*) {
+    return switch (ptr_mat.*) {
+        .DiffuseLight => |m| utils_materials.get_emitted_color(
+            m.color,
+            m.intensity,
+            m.exposition,
+            m.decay_mode,
+            ray_total_length,
+        ),
         .Lambertian => |v| utils_materials.scatter_lambertian(
-            hit.p,
-            hit.n,
+            p,
+            normal,
             v.base_color,
             v.base,
             v.ambiant,
-            &render_data_per_thread.rnd,
+            rng,
         ),
         .Metal => |v| utils_materials.scatter_metal(
-            hit.p,
-            hit.ray_direction,
-            hit.n,
+            p,
+            ray_direction,
+            normal,
             v.base_color,
             v.base,
             v.ambiant,
             v.fuzz,
-            &render_data_per_thread.rnd,
+            rng,
         ),
         .Phong => unreachable,
-        .DiffuseLight => unreachable,
     };
-
-    if (hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
-    }
-
-    pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
-
-    switch (hit.handle_hittable) {
-        .HandleEnv => {
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-            return;
-        },
-        inline else => {},
-    }
-
-    if (bounce_idx == self.render_info.bounces) {
-        pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
-    }
-
-    const new_hit = self.renderer_ray_collision.send_ray_on_hittable(
-        scatter_result.ray,
-    );
-
-    if (new_hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
-    }
-
-    pixel_payload.ray_total_length += new_hit.t;
-
-    try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
 }
 
 // -- Render Type : SingleThread ---------------------------------------------

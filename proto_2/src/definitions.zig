@@ -32,8 +32,20 @@ pub const AovStandardEnum = enum {
     Alpha,
     Depth,
     Normal,
+
     Direct,
     Indirect,
+
+    Emission,
+
+    Diffuse,
+    DiffuseDirect,
+    DiffuseIndirect,
+
+    Specular,
+    SpecularDirect,
+    SpecularIndirect,
+
     DebugCheeseNan,
     DebugTimePerPixel,
 };
