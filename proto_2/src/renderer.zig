@@ -515,6 +515,192 @@ fn render_ray_trace(
     }
 }
 
+fn render_ray_trace_primary_ray(
+    self: *Renderer,
+    thread_idx: usize,
+    hit: RendererRayCollision.HitRecord,
+) !void {
+    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
+    var pixel_payload = &render_data_per_thread.pixel_payload;
+
+    const ContributionEnum = PixelPayload.ContributionEnum;
+
+    const scatter_result = try self.scatter(
+        hit.p,
+        hit.ray_direction,
+        hit.n,
+        &render_data_per_thread.rnd,
+        hit.handle_mat,
+        pixel_payload.ray_total_length,
+    );
+
+    // -- handling emission / lights --
+    if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
+        pixel_payload.add_contribution(ContributionEnum.Emission, scatter_result.emission.?);
+        return;
+    }
+
+    if (hit.does_hit == 0) {
+        return;
+    }
+
+    // -- handling end cases --
+    switch (hit.handle_hittable) {
+        .HandleEnv => {
+            pixel_payload.reset_contribution(ContributionEnum.Emission);
+            return;
+        },
+        inline else => {},
+    }
+
+    // -- propagating child rays --
+    var hit_something: bool = false;
+
+    // -- * diffuse --
+    if (scatter_result.ray_diffuse != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
+        pixel_payload.ray_total_length += new_hit.t;
+        if (new_hit.does_hit == 1) {
+            hit_something = true;
+            try self.render_ray_trace_secondary_ray(thread_idx, 0, new_hit, RayType.Diffuse);
+        }
+    }
+
+    // -- * specular --
+    if (scatter_result.ray_specular != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
+        pixel_payload.ray_total_length += new_hit.t;
+        if (new_hit.does_hit == 1) {
+            hit_something = true;
+            try self.render_ray_trace_secondary_ray(thread_idx, 0, new_hit, RayType.Specular);
+        }
+    }
+
+    if (!hit_something) {
+        return;
+    }
+}
+
+fn render_ray_trace_secondary_ray(
+    self: *Renderer,
+    thread_idx: usize,
+    bounce_idx: u8,
+    hit: RendererRayCollision.HitRecord,
+    ray_type: RayType,
+) !void {
+    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
+    var pixel_payload = &render_data_per_thread.pixel_payload;
+
+    const ContributionEnum = PixelPayload.ContributionEnum;
+
+    const contribution: ContributionEnum = switch (ray_type) {
+        .Primary => ContributionEnum.Emission,
+        .Specular => if (bounce_idx < 2) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
+        .Diffuse => if (bounce_idx < 2) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
+    };
+
+    const scatter_result = try self.scatter(
+        hit.p,
+        hit.ray_direction,
+        hit.n,
+        &render_data_per_thread.rnd,
+        hit.handle_mat,
+        pixel_payload.ray_total_length,
+    );
+
+    // -- handling emission / lights --
+    if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
+
+        // pixel_payload.product_aov_buffer_value(
+        //     AovStandardEnum.Beauty,
+        //     scatter_result.emission.?,
+        // );
+
+        pixel_payload.add_contribution(contribution, scatter_result.emission.?);
+
+        // const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
+        // pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
+
+        // -> TODO: dump buffer!
+        return;
+    }
+
+    if (hit.does_hit == 0) {
+        pixel_payload.reset_contribution(contribution);
+        // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
+        return;
+    }
+
+    // pixel_payload.add_contribution(contribution, scatter_result.attenuation);
+    // pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
+
+    // -- handling end cases --
+    switch (hit.handle_hittable) {
+        .HandleEnv => {
+            pixel_payload.reset_contribution(contribution);
+            // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
+            return;
+        },
+        inline else => {},
+    }
+    if (bounce_idx == self.render_info.bounces) {
+        pixel_payload.reset_contribution(contribution);
+        // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
+        return;
+    }
+
+    // -- propagating child rays --
+    var hit_something: bool = false;
+
+    // !! SO INDIRECT: multiply with direct value and continue its "propagation"
+    // !! multiply the indirect value, directly copy from direct.
+    // !! then substract the direct value from the indirect value... and you got valid indirect value.
+
+    // -- * diffuse --
+    if (scatter_result.ray_diffuse != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
+        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            if (bounce_idx < 2) {
+                pixel_payload.add_contribution(ContributionEnum.DiffuseDirect, scatter_result.attenuation);
+            } else {
+                pixel_payload.add_contribution(ContributionEnum.DiffuseIndirect, scatter_result.attenuation);
+            }
+            hit_something = true;
+            const new_ray_type = switch (ray_type) {
+                .Primary => RayType.Diffuse,
+                inline else => ray_type,
+            };
+            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit, new_ray_type);
+        }
+    }
+
+    // -- * specular --
+    if (scatter_result.ray_specular != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
+        pixel_payload.ray_total_length += new_hit.t;
+        if (new_hit.does_hit == 1) {
+            if (bounce_idx < 2) {
+                pixel_payload.add_contribution(ContributionEnum.SpecularDirect, scatter_result.attenuation);
+            } else {
+                pixel_payload.add_contribution(ContributionEnum.SpecularIndirect, scatter_result.attenuation);
+            }
+            hit_something = true;
+            const new_ray_type = switch (ray_type) {
+                .Primary => RayType.Specular,
+                inline else => ray_type,
+            };
+            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit, new_ray_type);
+        }
+    }
+
+    if (!hit_something) {
+        pixel_payload.reset_contribution(contribution);
+        // pixel_payload.set_aov_buffer_to_black(AovStandardEnum.Beauty);
+        return;
+    }
+}
+
 pub fn convert_shading_contribution_to_aov(pixel_payload: *PixelPayload) void {
     const ContributionEnum = PixelPayload.ContributionEnum;
     const contribution_emission = pixel_payload.get_contribution(ContributionEnum.Emission);
