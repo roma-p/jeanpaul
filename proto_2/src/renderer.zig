@@ -40,6 +40,7 @@ const RenderInfo = data_render_info.RenderInfo;
 const PixelPayload = data_pixel_payload.PixelPayload;
 const Vec3f32 = math_vec.Vec3f32;
 const Ray = maths_ray.Ray;
+const ScatterResult = utils_materials.ScatterResult;
 
 renderer_ray_collision: RendererRayCollision,
 
@@ -397,49 +398,22 @@ fn render_ray_trace(
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
     var pixel_payload = &render_data_per_thread.pixel_payload;
 
-    var controller_material = &self.controller_scene.controller_material;
+    const scatter_result = try self.scatter(
+        hit.p,
+        hit.ray_direction,
+        hit.n,
+        &render_data_per_thread.rnd,
+        hit.handle_mat,
+        pixel_payload.ray_total_length,
+    );
 
-    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
-
-    switch (ptr_mat.*) {
-        .DiffuseLight => |m| {
-            const emitted_color = utils_materials.get_emitted_color(
-                m.color,
-                m.intensity,
-                m.exposition,
-                m.decay_mode,
-                pixel_payload.ray_total_length,
-            );
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, emitted_color);
-            const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
-            pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
-            return;
-        },
-        inline else => {},
+    // -- handling emission / lights --
+    if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
+        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.emission.?);
+        const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
+        pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
+        return;
     }
-
-    const scatter_result = try switch (ptr_mat.*) {
-        .Lambertian => |v| utils_materials.scatter_lambertian(
-            hit.p,
-            hit.n,
-            v.base_color,
-            v.base,
-            v.ambiant,
-            &render_data_per_thread.rnd,
-        ),
-        .Metal => |v| utils_materials.scatter_metal(
-            hit.p,
-            hit.ray_direction,
-            hit.n,
-            v.base_color,
-            v.base,
-            v.ambiant,
-            v.fuzz,
-            &render_data_per_thread.rnd,
-        ),
-        .Phong => unreachable,
-        .DiffuseLight => unreachable,
-    };
 
     if (hit.does_hit == 0) {
         pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
@@ -461,18 +435,40 @@ fn render_ray_trace(
         return;
     }
 
-    const new_hit = self.renderer_ray_collision.send_ray_on_hittable(
-        scatter_result.ray,
-    );
+    // -- propagating child rays --
+    var hit_something: bool = false;
 
-    if (new_hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
+    // -- * diffuse --
+    if (scatter_result.ray_diffuse != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
+        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            if (bounce_idx < 2) {
+                pixel_payload.product_aov_buffer_value(AovStandardEnum.Direct, scatter_result.attenuation);
+            } else {
+                pixel_payload.product_aov_buffer_value(AovStandardEnum.Indirect, scatter_result.attenuation);
+            }
+            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation); // DEL ME.
+            hit_something = true;
+            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+        }
     }
 
-    pixel_payload.ray_total_length += new_hit.t;
-
-    try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+    // -- * specular --
+    if (scatter_result.ray_specular != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
+        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            if (bounce_idx < 2) {
+                pixel_payload.product_aov_buffer_value(AovStandardEnum.Direct, scatter_result.attenuation);
+            } else {
+                pixel_payload.product_aov_buffer_value(AovStandardEnum.Indirect, scatter_result.attenuation);
+            }
+            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation); // DEL ME.
+            hit_something = true;
+            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+        }
+    }
 }
 
 fn render_ray_trace_single_sample(
@@ -633,4 +629,46 @@ fn render_tile_single_thread_func(self: *Renderer, thread_idx: usize) !void {
             return;
         }
     }
+}
+
+pub fn scatter(
+    self: *Renderer,
+    p: Vec3f32,
+    ray_direction: Vec3f32,
+    normal: Vec3f32,
+    rng: *RndGen,
+    handle_mat: data_handles.HandleMaterial,
+    ray_total_length: f32,
+) !ScatterResult {
+    const controller_material = &self.controller_scene.controller_material;
+    const ptr_mat = try controller_material.get_mat_pointer(handle_mat);
+
+    return switch (ptr_mat.*) {
+        .DiffuseLight => |m| utils_materials.get_emitted_color(
+            m.color,
+            m.intensity,
+            m.exposition,
+            m.decay_mode,
+            ray_total_length,
+        ),
+        .Lambertian => |v| utils_materials.scatter_lambertian(
+            p,
+            normal,
+            v.base_color,
+            v.base,
+            v.ambiant,
+            rng,
+        ),
+        .Metal => |v| utils_materials.scatter_metal(
+            p,
+            ray_direction,
+            normal,
+            v.base_color,
+            v.base,
+            v.ambiant,
+            v.fuzz,
+            rng,
+        ),
+        .Phong => unreachable,
+    };
 }
