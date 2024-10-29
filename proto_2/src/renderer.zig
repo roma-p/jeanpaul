@@ -25,7 +25,6 @@ const data_handles = @import("data_handle.zig");
 const data_color = @import("data_color.zig");
 const data_render_info = @import("data_render_info.zig");
 const data_render_settings = @import("data_render_settings.zig");
-const data_pixel_payload = @import("data_pixel_payload.zig");
 
 const ControllereScene = @import("controller_scene.zig");
 const ControllereObject = @import("controller_object.zig");
@@ -33,15 +32,16 @@ const ControllerAov = @import("controller_aov.zig");
 const ControllerImg = @import("controller_img.zig");
 
 const RendererRayCollision = @import("renderer_ray_collision.zig");
+const renderer_scratch_buffer = @import("renderer_scratch_buffer.zig");
 
 const Renderer = @This();
 
 const RenderInfo = data_render_info.RenderInfo;
-const PixelPayload = data_pixel_payload.PixelPayload;
+const ScratchBuffer = renderer_scratch_buffer.ScratchBuffer;
 const Vec3f32 = math_vec.Vec3f32;
 const Ray = maths_ray.Ray;
 const ScatterResult = utils_materials.ScatterResult;
-const ContributionEnum = data_pixel_payload.ContributionEnum;
+const ContributionEnum = renderer_scratch_buffer.ContributionEnum;
 
 renderer_ray_collision: RendererRayCollision,
 
@@ -89,7 +89,7 @@ pub fn deinit(self: *Renderer) void {
 
 const RenderDataPerThread = struct {
     rnd: RndGen,
-    pixel_payload: PixelPayload,
+    scratch_buffer: ScratchBuffer,
 };
 
 const RenderDataShared = struct {
@@ -261,7 +261,7 @@ fn prepare_render(self: *Renderer, camera_handle: data_handles.HandleCamera, thr
     var i: usize = 0;
     while (i < thread_nbr) : (i += 1) {
         const render_data_per_thread = RenderDataPerThread{
-            .pixel_payload = try PixelPayload.init(
+            .scratch_buffer = try ScratchBuffer.init(
                 &self.controller_scene.controller_aov,
                 self.render_info.samples_invert,
                 self.render_info.samples_antialasing_invert,
@@ -274,7 +274,7 @@ fn prepare_render(self: *Renderer, camera_handle: data_handles.HandleCamera, thr
 
 fn dispose_render(self: *Renderer) void {
     for (self.array_render_data_per_thread.items) |*data| {
-        data.pixel_payload.deinit();
+        data.scratch_buffer.deinit();
     }
     self.array_render_data_per_thread.clearAndFree();
     self.render_info = undefined;
@@ -285,7 +285,7 @@ fn dispose_render(self: *Renderer) void {
 // -- Render entry point -----------------------------------------------------
 
 fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
-    var pixel_payload = &self.array_render_data_per_thread.items[thread_idx].pixel_payload;
+    var pixel_payload = &self.array_render_data_per_thread.items[thread_idx].scratch_buffer;
     pixel_payload.reset();
 
     // time per pixel AOV handling.
@@ -321,7 +321,7 @@ fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
 
 fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.pixel_payload;
+    var pixel_payload = &render_data_per_thread.scratch_buffer;
     var controller_material = &self.controller_scene.controller_material;
 
     const x_f32 = utils_zig.cast_u16_to_f32(x);
@@ -394,7 +394,7 @@ fn render_px_aa_sample_sp_sample_prim_ray(
 ) !void {
     // -- scattering shading point. --
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.pixel_payload;
+    var pixel_payload = &render_data_per_thread.scratch_buffer;
     const scatter_result = try self.scatter(
         hit.p,
         hit.ray_direction,
@@ -461,7 +461,7 @@ fn render_px_aa_sample_sp_sample_sec_ray(
 ) !void {
     // -- scattering shading point. --
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.pixel_payload;
+    var pixel_payload = &render_data_per_thread.scratch_buffer;
     const scatter_result = try self.scatter(
         hit.p,
         hit.ray_direction,

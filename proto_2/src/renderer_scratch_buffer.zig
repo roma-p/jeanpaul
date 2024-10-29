@@ -17,7 +17,7 @@ pub const ContributionEnum = enum {
     SpecularIndirect,
 };
 
-pub const PixelPayload = struct {
+pub const ScratchBuffer = struct {
     aov_to_color: std.AutoHashMap(AovStandardEnum, Color),
     contribution_to_color: [@typeInfo(ContributionEnum).Enum.fields.len]Color,
     contribution_to_color_buffer: [@typeInfo(ContributionEnum).Enum.fields.len]Color,
@@ -124,7 +124,6 @@ pub const PixelPayload = struct {
             contribution_value = data_color.COLOR_WHITE;
         }
         self.contribution_to_color_buffer[i] = contribution_value.multiply_color(color);
-        // self.contribution_to_color_buffer[i].log_debug(); DELME
     }
 
     pub fn reset_contribution_buffer(self: *Self, contribution_id: ContributionEnum) void {
@@ -143,7 +142,6 @@ pub const PixelPayload = struct {
             const value = self.contribution_to_color_buffer[i].product(self.sample_weight);
             self.contribution_to_color[i] = self.contribution_to_color[i].sum_color(value);
         }
-        // self.log_debug_contribution();
     }
 
     pub fn log_debug_contribution(self: *Self) void {
