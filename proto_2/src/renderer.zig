@@ -41,6 +41,7 @@ const PixelPayload = data_pixel_payload.PixelPayload;
 const Vec3f32 = math_vec.Vec3f32;
 const Ray = maths_ray.Ray;
 const ScatterResult = utils_materials.ScatterResult;
+const ContributionEnum = data_pixel_payload.ContributionEnum;
 
 renderer_ray_collision: RendererRayCollision,
 
@@ -56,6 +57,8 @@ array_thread: std.ArrayList(Thread),
 array_render_data_per_thread: std.ArrayList(RenderDataPerThread),
 
 const AOV_NOT_CLAMP = [_]AovStandardEnum{AovStandardEnum.Depth};
+
+const RayType = enum { Primary, Specular, Diffuse };
 
 pub fn init(controller_scene: *ControllereScene) !Renderer {
     return .{
@@ -226,7 +229,6 @@ pub fn render(
     );
 
     // TODO: iterate over aov_to_image_layer. if not in "non clamp", clamp it.
-
     // clamping depth for ppm format. remove this when .exr supported.
     const image_layer_idx = self.aov_to_image_layer.get(AovStandardEnum.Depth);
     if (image_layer_idx != null) {
@@ -282,25 +284,44 @@ fn dispose_render(self: *Renderer) void {
 
 // -- Render entry point -----------------------------------------------------
 
-fn render_single_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
+fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     var pixel_payload = self.array_render_data_per_thread.items[thread_idx].pixel_payload;
     pixel_payload.reset();
 
+    // time per pixel AOV handling.
+    const is_time_to_count: bool = pixel_payload.check_has_aov(AovStandardEnum.DebugTimePerPixel);
+    var time_start: i64 = undefined;
+    if (is_time_to_count) time_start = std.time.timestamp();
+
+    // rendering once per AA sample.
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_antialasing_nbr) : (sample_i += 1) {
-        try self.render_single_px_single_antialiasing_sample(x, y, thread_idx);
+        try self.render_px_aa_sample(x, y, thread_idx);
     }
+
+    // writing aov from contributions data.
+    pixel_payload.dump_contributions_to_aovs();
     var it = pixel_payload.aov_to_color.iterator();
     while (it.next()) |item| {
         const layer_index = self.aov_to_image_layer.get(item.key_ptr.*) orelse unreachable;
         try self.controller_img.write_to_px(x, y, layer_index, item.value_ptr.*);
     }
+
+    // time per pixel AOV handling.
+    if (is_time_to_count) {
+        const time_end = std.time.timestamp();
+        const elapsed: i64 = time_end - time_start;
+        const elapsed_as_f32: f32 = @as(f32, @floatFromInt(elapsed));
+        pixel_payload.set_aov(
+            AovStandardEnum.DebugTimePerPixel,
+            data_color.Color.create_from_value_not_clamped(elapsed_as_f32),
+        );
+    }
 }
 
-fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
+fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
     var pixel_payload = &render_data_per_thread.pixel_payload;
-
     var controller_material = &self.controller_scene.controller_material;
 
     const x_f32 = utils_zig.cast_u16_to_f32(x);
@@ -308,10 +329,7 @@ fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, 
 
     const render_info = self.render_info;
 
-    const calculate_time: bool = pixel_payload.check_has_aov(AovStandardEnum.DebugTimePerPixel);
-    var time_start: i64 = undefined;
-    if (calculate_time) time_start = std.time.timestamp();
-
+    //  -- launch primary rays
     const ray_direction = utils_camera.get_ray_direction_from_focal_plane(
         render_info.camera_position,
         render_info.focal_plane_center,
@@ -322,9 +340,6 @@ fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, 
         y_f32,
         &render_data_per_thread.rnd,
     );
-
-    //  -- launch primary rays -----------------------------------------------
-
     const hit = self.renderer_ray_collision.send_ray_on_hittable(
         Ray{ .o = render_info.camera_position, .d = ray_direction },
     );
@@ -332,20 +347,13 @@ fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, 
     if (hit.does_hit == 0) return;
 
     pixel_payload.ray_total_length = hit.t;
-
     const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
 
-    // -- write AOV that only depends on primary rays ------------------------
+    // -- write AOV that only depends on primary rays
 
-    pixel_payload.add_sample_to_aov(AovStandardEnum.Alpha, data_color.COLOR_WHITE);
+    pixel_payload.add_aa_sample_to_aov(AovStandardEnum.Alpha, data_color.COLOR_WHITE);
 
-    // /!\ value not clamped...
-    pixel_payload.add_sample_to_aov(
-        AovStandardEnum.Depth,
-        data_color.Color.create_from_value_not_clamped(hit.t),
-    );
-
-    pixel_payload.add_sample_to_aov(
+    pixel_payload.add_aa_sample_to_aov(
         AovStandardEnum.Normal,
         data_color.Color{
             .r = (hit.n.x + 1) / 2,
@@ -354,7 +362,7 @@ fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, 
         },
     );
 
-    pixel_payload.add_sample_to_aov(
+    pixel_payload.add_aa_sample_to_aov(
         AovStandardEnum.Albedo,
         switch (ptr_mat.*) {
             .Lambertian => |v| v.base_color,
@@ -364,40 +372,32 @@ fn render_single_px_single_antialiasing_sample(self: *Renderer, x: u16, y: u16, 
         },
     );
 
-    // -- doing the ray tracing ----------------------------------------------
+    // /!\ value not clamped...
+    pixel_payload.add_aa_sample_to_aov(
+        AovStandardEnum.Depth,
+        data_color.Color.create_from_value_not_clamped(hit.t),
+    );
 
-    pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_WHITE);
-    pixel_payload.set_aov_buffer_value(AovStandardEnum.Direct, data_color.COLOR_BlACK);
-    pixel_payload.set_aov_buffer_value(AovStandardEnum.Indirect, data_color.COLOR_BlACK);
-
-    try self.render_ray_trace(thread_idx, 0, hit);
-    pixel_payload.dump_buffer_to_aov();
-
-    const c = pixel_payload.get_aov_value(AovStandardEnum.Beauty).?;
-    if (std.math.isNan(c.r) or std.math.isNan(c.g) or std.math.isNan(c.b)) {
-        pixel_payload.set_aov(AovStandardEnum.DebugCheeseNan, data_color.COLOR_WHITE);
-    }
-
-    if (calculate_time) {
-        const time_end = std.time.timestamp();
-        const elapsed: i64 = time_end - time_start;
-        const elapsed_as_f32: f32 = @as(f32, @floatFromInt(elapsed));
-        pixel_payload.set_aov_buffer_value(
-            AovStandardEnum.DebugTimePerPixel,
-            data_color.Color.create_from_value_not_clamped(elapsed_as_f32),
-        );
+    // ray tracing shading point for every sample
+    var sample_i: usize = 0;
+    while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
+        pixel_payload.reset_all_contribution_buffer();
+        try self.render_px_aa_sample_sp_sample(thread_idx, 0, hit, RayType.Primary);
+        pixel_payload.dump_contribution_buffer();
     }
 }
 
-fn render_ray_trace(
+fn render_px_aa_sample_sp_sample(
     self: *Renderer,
     thread_idx: usize,
     bounce_idx: u8,
     hit: RendererRayCollision.HitRecord,
+    ray_type: RayType,
 ) !void {
+
+    // -- scattering shading point. --
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
     var pixel_payload = &render_data_per_thread.pixel_payload;
-
     const scatter_result = try self.scatter(
         hit.p,
         hit.ray_direction,
@@ -407,155 +407,105 @@ fn render_ray_trace(
         pixel_payload.ray_total_length,
     );
 
+    // -- determining which contribution we are working on.
+    const is_direct: bool = bounce_idx < 2;
+    const contribution = switch (ray_type) {
+        .Primary => ContributionEnum.Emission,
+        .Specular => if (is_direct) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
+        .Diffuse => if (is_direct) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
+    };
+
     // -- handling emission / lights --
     if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.emission.?);
-        const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
-        pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
+        const emission = scatter_result.emission.?;
+        pixel_payload.add_to_contribution_buffer(contribution, emission);
         return;
     }
 
+    // -- if nothing was hit, blacking out contribution.
     if (hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+        pixel_payload.reset_contribution_buffer(contribution);
         return;
     }
 
-    pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
+    //  -- adding the contribution.
+    pixel_payload.add_to_contribution_buffer(contribution, scatter_result.attenuation);
 
+    // -- if hit skydome, ending raytracing.
     switch (hit.handle_hittable) {
         .HandleEnv => {
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
             return;
         },
         inline else => {},
     }
 
+    // -- if bounce limit reached, returning.
     if (bounce_idx == self.render_info.bounces) {
-        pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
+        pixel_payload.reset_contribution_buffer(contribution);
         return;
     }
 
-    // -- propagating child rays --
-    var hit_something: bool = false;
+    // -- propagating rays
 
-    // -- * diffuse --
+    // --- * diffuse
     if (scatter_result.ray_diffuse != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
         pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
-            if (bounce_idx < 2) {
-                pixel_payload.product_aov_buffer_value(AovStandardEnum.Direct, scatter_result.attenuation);
-            } else {
-                pixel_payload.product_aov_buffer_value(AovStandardEnum.Indirect, scatter_result.attenuation);
-            }
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation); // DEL ME.
-            hit_something = true;
-            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+            try self.render_px_aa_sample_sp_sample(thread_idx, bounce_idx + 1, new_hit, RayType.Diffuse);
         }
     }
 
-    // -- * specular --
+    // --- * specular
     if (scatter_result.ray_specular != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
         pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
-            if (bounce_idx < 2) {
-                pixel_payload.product_aov_buffer_value(AovStandardEnum.Direct, scatter_result.attenuation);
-            } else {
-                pixel_payload.product_aov_buffer_value(AovStandardEnum.Indirect, scatter_result.attenuation);
-            }
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation); // DEL ME.
-            hit_something = true;
-            try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
+            try self.render_px_aa_sample_sp_sample(thread_idx, bounce_idx + 1, new_hit, RayType.Specular);
         }
     }
 }
 
-fn render_ray_trace_single_sample(
+pub fn scatter(
     self: *Renderer,
-    thread_idx: usize,
-    bounce_idx: u8,
-    hit: RendererRayCollision.HitRecord,
-) !void {
-    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.pixel_payload;
+    p: Vec3f32,
+    ray_direction: Vec3f32,
+    normal: Vec3f32,
+    rng: *RndGen,
+    handle_mat: data_handles.HandleMaterial,
+    ray_total_length: f32,
+) !ScatterResult {
+    const controller_material = &self.controller_scene.controller_material;
+    const ptr_mat = try controller_material.get_mat_pointer(handle_mat);
 
-    var controller_material = &self.controller_scene.controller_material;
-
-    const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
-
-    switch (ptr_mat.*) {
-        .DiffuseLight => |m| {
-            const emitted_color = utils_materials.get_emitted_color(
-                m.color,
-                m.intensity,
-                m.exposition,
-                m.decay_mode,
-                pixel_payload.ray_total_length,
-            );
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, emitted_color);
-            const aov = if (bounce_idx < 2) AovStandardEnum.Direct else AovStandardEnum.Indirect;
-            pixel_payload.copy_aov_buffer_value(AovStandardEnum.Beauty, aov);
-            return;
-        },
-        inline else => {},
-    }
-
-    const scatter_result = try switch (ptr_mat.*) {
+    return switch (ptr_mat.*) {
+        .DiffuseLight => |m| utils_materials.get_emitted_color(
+            m.color,
+            m.intensity,
+            m.exposition,
+            m.decay_mode,
+            ray_total_length,
+        ),
         .Lambertian => |v| utils_materials.scatter_lambertian(
-            hit.p,
-            hit.n,
+            p,
+            normal,
             v.base_color,
             v.base,
             v.ambiant,
-            &render_data_per_thread.rnd,
+            rng,
         ),
         .Metal => |v| utils_materials.scatter_metal(
-            hit.p,
-            hit.ray_direction,
-            hit.n,
+            p,
+            ray_direction,
+            normal,
             v.base_color,
             v.base,
             v.ambiant,
             v.fuzz,
-            &render_data_per_thread.rnd,
+            rng,
         ),
         .Phong => unreachable,
-        .DiffuseLight => unreachable,
     };
-
-    if (hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
-    }
-
-    pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, scatter_result.attenuation);
-
-    switch (hit.handle_hittable) {
-        .HandleEnv => {
-            pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-            return;
-        },
-        inline else => {},
-    }
-
-    if (bounce_idx == self.render_info.bounces) {
-        pixel_payload.set_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
-    }
-
-    const new_hit = self.renderer_ray_collision.send_ray_on_hittable(
-        scatter_result.ray,
-    );
-
-    if (new_hit.does_hit == 0) {
-        pixel_payload.product_aov_buffer_value(AovStandardEnum.Beauty, data_color.COLOR_BlACK);
-        return;
-    }
-
-    pixel_payload.ray_total_length += new_hit.t;
-
-    try self.render_ray_trace(thread_idx, bounce_idx + 1, new_hit);
 }
 
 // -- Render Type : SingleThread ---------------------------------------------
@@ -569,7 +519,8 @@ fn render_singlethread(self: *Renderer) !void {
     while (_x < render_info.image_width) : (_x += 1) {
         _y = 0;
         while (_y < render_info.image_height) : (_y += 1) {
-            try self.render_single_px(_x, _y, 0);
+            try self.render_px(_x, _y, 0);
+            // TODO: do this less often...
             self.render_shared_data.add_rendered_pixel_number(1);
         }
         self.render_shared_data.update_progress();
@@ -621,7 +572,7 @@ fn render_tile_single_thread_func(self: *Renderer, thread_idx: usize) !void {
             while (_x <= tile_bounding_rect.x_max) : (_x += 1) {
                 _y = tile_bounding_rect.y_min;
                 while (_y <= tile_bounding_rect.y_max) : (_y += 1) {
-                    try self.render_single_px(_x, _y, thread_idx);
+                    try self.render_px(_x, _y, thread_idx);
                 }
             }
             is_a_tile_finished_render = true;
@@ -631,46 +582,8 @@ fn render_tile_single_thread_func(self: *Renderer, thread_idx: usize) !void {
     }
 }
 
-pub fn scatter(
-    self: *Renderer,
-    p: Vec3f32,
-    ray_direction: Vec3f32,
-    normal: Vec3f32,
-    rng: *RndGen,
-    handle_mat: data_handles.HandleMaterial,
-    ray_total_length: f32,
-) !ScatterResult {
-    const controller_material = &self.controller_scene.controller_material;
-    const ptr_mat = try controller_material.get_mat_pointer(handle_mat);
+// -- Render Type : Pixel ----------------------------------------------------
 
-    return switch (ptr_mat.*) {
-        .DiffuseLight => |m| utils_materials.get_emitted_color(
-            m.color,
-            m.intensity,
-            m.exposition,
-            m.decay_mode,
-            ray_total_length,
-        ),
-        .Lambertian => |v| utils_materials.scatter_lambertian(
-            p,
-            normal,
-            v.base_color,
-            v.base,
-            v.ambiant,
-            rng,
-        ),
-        .Metal => |v| utils_materials.scatter_metal(
-            p,
-            ray_direction,
-            normal,
-            v.base_color,
-            v.base,
-            v.ambiant,
-            v.fuzz,
-            rng,
-        ),
-        .Phong => unreachable,
-    };
 fn render_pixel(self: *Renderer) !void {
     const render_info = self.render_info;
 

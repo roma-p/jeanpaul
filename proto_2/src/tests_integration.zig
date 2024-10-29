@@ -119,8 +119,8 @@ test "prepare_render" {
     controller_scene.render_settings.tile_size = 128;
     controller_scene.render_settings.samples = 1;
     controller_scene.render_settings.samples_antialiasing = 1;
-    controller_scene.render_settings.bounces = 2;
-    controller_scene.render_settings.render_type = data_render_settings.RenderType.Pixel;
+    controller_scene.render_settings.bounces = 1;
+    controller_scene.render_settings.render_type = data_render_settings.RenderType.Tile;
     controller_scene.render_settings.render_single_px_x = 320;
     controller_scene.render_settings.render_single_px_y = 240;
     controller_scene.render_settings.color_space = data_render_settings.ColorSpace.DefaultGamma2;
@@ -133,7 +133,17 @@ test "prepare_render" {
     try controller_aov.add_aov_standard(AovStandard.Depth);
     try controller_aov.add_aov_standard(AovStandard.Direct);
     try controller_aov.add_aov_standard(AovStandard.Indirect);
+
+    try controller_aov.add_aov_standard(AovStandard.Emission);
+    try controller_aov.add_aov_standard(AovStandard.Diffuse);
+    try controller_aov.add_aov_standard(AovStandard.DiffuseDirect);
+    try controller_aov.add_aov_standard(AovStandard.DiffuseIndirect);
+    try controller_aov.add_aov_standard(AovStandard.Specular);
+    try controller_aov.add_aov_standard(AovStandard.SpecularDirect);
+    try controller_aov.add_aov_standard(AovStandard.SpecularIndirect);
+
     try controller_aov.add_aov_standard(AovStandard.DebugCheeseNan);
+
     // try controller_aov.add_aov_standard(AovStandard.DebugTimePerPixel);
 
     var renderer = try Renderer.init(&controller_scene);
