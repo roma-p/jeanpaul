@@ -135,7 +135,7 @@ const RenderDataShared = struct {
                     },
                 },
                 .Scanline => unreachable,
-                .Pixel => unreachable,
+                .Pixel => .{ .Pixel = .{} },
                 .SingleThread => .{ .SingleThread = .{} },
             },
         };
@@ -215,7 +215,7 @@ pub fn render(
         data_render_settings.RenderType.Tile => try render_tile(self),
         data_render_settings.RenderType.SingleThread => try render_singlethread(self),
         data_render_settings.RenderType.Scanline => unreachable,
-        data_render_settings.RenderType.Pixel => unreachable,
+        data_render_settings.RenderType.Pixel => try render_pixel(self),
     }
 
     const time_end = std.time.timestamp();
@@ -671,4 +671,23 @@ pub fn scatter(
         ),
         .Phong => unreachable,
     };
+fn render_pixel(self: *Renderer) !void {
+    const render_info = self.render_info;
+
+    const px_x = render_info.data_per_render_type.Pixel.render_single_px_x;
+    const px_y = render_info.data_per_render_type.Pixel.render_single_px_y;
+
+    if (px_x > render_info.image_width or px_y > render_info.image_height) {
+        std.debug.print(
+            "pixel asked ({d},{d}) outside of image ({d}x{d})\n",
+            .{ px_x, px_y, render_info.image_width, render_info.image_height },
+        );
+        return;
+    }
+
+    std.debug.print(
+        "rendering pixel: ({d},{d}), image size : ({d}x{d})\n",
+        .{ px_x, px_y, render_info.image_width, render_info.image_height },
+    );
+    try self.render_px(px_x, px_y, 0);
 }

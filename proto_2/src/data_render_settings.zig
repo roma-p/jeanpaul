@@ -2,6 +2,8 @@ pub const RenderSettings = @This();
 
 width: u16 = 1920,
 height: u16 = 1080,
+render_single_px_x: u16 = 0,
+render_single_px_y: u16 = 0,
 samples: u8 = 5,
 samples_antialiasing: u8 = 5,
 bounces: u8 = 16,

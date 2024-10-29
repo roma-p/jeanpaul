@@ -41,7 +41,10 @@ pub const RenderInfo = struct {
     thread_nbr: usize,
 
     pub const DataPerRenderType = union(data_render_settings.RenderType) {
-        Pixel: struct {},
+        Pixel: struct {
+            render_single_px_x: u16,
+            render_single_px_y: u16,
+        },
         Scanline: struct {},
         Tile: struct {
             tile_size: u16,
@@ -140,9 +143,14 @@ pub const RenderInfo = struct {
                         .tile_y_number = tile_x_y.y,
                     },
                 },
-                data_render_settings.RenderType.Scanline => unreachable,
-                data_render_settings.RenderType.Pixel => unreachable,
+                data_render_settings.RenderType.Pixel => .{
+                    .Pixel = .{
+                        .render_single_px_x = scene_render_settings.render_single_px_x,
+                        .render_single_px_y = scene_render_settings.render_single_px_y,
+                    },
+                },
                 data_render_settings.RenderType.SingleThread => .{ .SingleThread = .{} },
+                data_render_settings.RenderType.Scanline => unreachable,
             },
         };
     }
