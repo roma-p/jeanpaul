@@ -35,7 +35,7 @@ test "prepare_render" {
         Material{ .Metal = .{
             .base_color = data_color.Color{ .r = 1, .g = 0.3, .b = 0.4 },
             .base = 1,
-            .fuzz = 0.6,
+            .fuzz = 0.1,
         } },
     );
 
@@ -114,12 +114,12 @@ test "prepare_render" {
         TMatrix.create_at_position(Vec3f32{ .x = 0, .y = 0, .z = 47 }),
     );
 
-    controller_scene.render_settings.width = 640;
-    controller_scene.render_settings.height = 480;
+    controller_scene.render_settings.width = 1920;
+    controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 1;
-    controller_scene.render_settings.samples_antialiasing = 1;
-    controller_scene.render_settings.bounces = 1;
+    controller_scene.render_settings.samples = 4;
+    controller_scene.render_settings.samples_antialiasing = 4;
+    controller_scene.render_settings.bounces = 6;
     controller_scene.render_settings.render_type = data_render_settings.RenderType.Tile;
     controller_scene.render_settings.render_single_px_x = 320;
     controller_scene.render_settings.render_single_px_y = 240;

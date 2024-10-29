@@ -58,7 +58,7 @@ array_render_data_per_thread: std.ArrayList(RenderDataPerThread),
 
 const AOV_NOT_CLAMP = [_]AovStandardEnum{AovStandardEnum.Depth};
 
-const RayType = enum { Primary, Specular, Diffuse };
+const RayType = enum { Specular, Diffuse };
 
 pub fn init(controller_scene: *ControllereScene) !Renderer {
     return .{
@@ -285,7 +285,7 @@ fn dispose_render(self: *Renderer) void {
 // -- Render entry point -----------------------------------------------------
 
 fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
-    var pixel_payload = self.array_render_data_per_thread.items[thread_idx].pixel_payload;
+    var pixel_payload = &self.array_render_data_per_thread.items[thread_idx].pixel_payload;
     pixel_payload.reset();
 
     // time per pixel AOV handling.
@@ -382,19 +382,83 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
         pixel_payload.reset_all_contribution_buffer();
-        try self.render_px_aa_sample_sp_sample(thread_idx, 0, hit, RayType.Primary);
+        try self.render_px_aa_sample_sp_sample_prim_ray(thread_idx, hit);
         pixel_payload.dump_contribution_buffer();
     }
 }
 
-fn render_px_aa_sample_sp_sample(
+fn render_px_aa_sample_sp_sample_prim_ray(
+    self: *Renderer,
+    thread_idx: usize,
+    hit: RendererRayCollision.HitRecord,
+) !void {
+    // -- scattering shading point. --
+    var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
+    var pixel_payload = &render_data_per_thread.pixel_payload;
+    const scatter_result = try self.scatter(
+        hit.p,
+        hit.ray_direction,
+        hit.n,
+        &render_data_per_thread.rnd,
+        hit.handle_mat,
+        pixel_payload.ray_total_length,
+    );
+
+    // -- handling emission / lights --
+    if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
+        const emission = scatter_result.emission.?;
+        pixel_payload.add_to_contribution_buffer(ContributionEnum.Emission, emission);
+        return;
+    }
+
+    // -- if nothing was hit, blacking out contribution.
+    if (hit.does_hit == 0) {
+        return;
+    }
+
+    //  -- adding the contribution.
+    const attenuation = scatter_result.attenuation;
+
+    // -- if hit skydome, ending raytracing.
+    switch (hit.handle_hittable) {
+        .HandleEnv => {
+            return;
+        },
+        inline else => {},
+    }
+
+    // -- propagating rays
+
+    // --- * diffuse
+    if (scatter_result.ray_diffuse != null) {
+        pixel_payload.add_to_contribution_buffer(ContributionEnum.DiffuseDirect, attenuation);
+        pixel_payload.add_to_contribution_buffer(ContributionEnum.DiffuseIndirect, attenuation);
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
+        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, RayType.Diffuse);
+        }
+    }
+
+    // --- * specular
+    if (scatter_result.ray_specular != null) {
+        pixel_payload.add_to_contribution_buffer(ContributionEnum.SpecularDirect, attenuation);
+        pixel_payload.add_to_contribution_buffer(ContributionEnum.SpecularIndirect, attenuation);
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
+        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, RayType.Specular);
+        }
+    }
+}
+
+fn render_px_aa_sample_sp_sample_sec_ray(
     self: *Renderer,
     thread_idx: usize,
     bounce_idx: u8,
     hit: RendererRayCollision.HitRecord,
     ray_type: RayType,
 ) !void {
-
     // -- scattering shading point. --
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
     var pixel_payload = &render_data_per_thread.pixel_payload;
@@ -410,7 +474,6 @@ fn render_px_aa_sample_sp_sample(
     // -- determining which contribution we are working on.
     const is_direct: bool = bounce_idx < 2;
     const contribution = switch (ray_type) {
-        .Primary => ContributionEnum.Emission,
         .Specular => if (is_direct) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
         .Diffuse => if (is_direct) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
     };
@@ -452,7 +515,7 @@ fn render_px_aa_sample_sp_sample(
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
         pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
-            try self.render_px_aa_sample_sp_sample(thread_idx, bounce_idx + 1, new_hit, RayType.Diffuse);
+            try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, bounce_idx + 1, new_hit, ray_type);
         }
     }
 
@@ -461,7 +524,7 @@ fn render_px_aa_sample_sp_sample(
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
         pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
-            try self.render_px_aa_sample_sp_sample(thread_idx, bounce_idx + 1, new_hit, RayType.Specular);
+            try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, bounce_idx + 1, new_hit, ray_type);
         }
     }
 }

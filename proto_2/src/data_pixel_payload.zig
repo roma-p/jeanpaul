@@ -149,7 +149,7 @@ pub const PixelPayload = struct {
     pub fn log_debug_contribution(self: *Self) void {
         var i: usize = 0;
         std.debug.print("current contribution is: \n", .{});
-        while (i < self.contribution_to_color_buffer.len) : (i += 1) {
+        while (i < self.contribution_to_color.len) : (i += 1) {
             const contribution = self.contribution_to_color[i];
             const enum_name: ContributionEnum = @enumFromInt(i);
             std.debug.print(
