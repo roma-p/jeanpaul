@@ -117,8 +117,8 @@ test "prepare_render" {
     controller_scene.render_settings.width = 1920;
     controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 1;
-    controller_scene.render_settings.samples_antialiasing = 1;
+    controller_scene.render_settings.samples = 3;
+    controller_scene.render_settings.samples_antialiasing = 3;
     controller_scene.render_settings.bounces = 6;
     controller_scene.render_settings.render_type = data_render_settings.RenderType.Tile;
     controller_scene.render_settings.color_space = data_render_settings.ColorSpace.DefaultGamma2;
