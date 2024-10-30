@@ -6,6 +6,7 @@ const AovStandardEnum = definitions.AovStandardEnum;
 
 const data_color = @import("data_color.zig");
 const Color = data_color.Color;
+const COLOR_BLACK = data_color.COLOR_BlACK;
 
 const ControllerAov = @import("controller_aov.zig");
 
@@ -19,8 +20,8 @@ pub const ContributionEnum = enum {
 
 pub const ScratchBuffer = struct {
     aov_to_color: std.AutoHashMap(AovStandardEnum, Color),
+    contribution_buffer: Color,
     contribution_to_color: [@typeInfo(ContributionEnum).Enum.fields.len]Color,
-    contribution_to_color_buffer: [@typeInfo(ContributionEnum).Enum.fields.len]Color,
     sample_nbr_invert: f32,
     sample_aa_nbr_invert: f32,
     sample_weight: f32,
@@ -35,15 +36,15 @@ pub const ScratchBuffer = struct {
     ) !Self {
         var ret = .{
             .aov_to_color = std.AutoHashMap(AovStandardEnum, data_color.Color).init(gpa),
-            .contribution_to_color = [1]Color{data_color.COLOR_BlACK} ** @typeInfo(ContributionEnum).Enum.fields.len,
-            .contribution_to_color_buffer = [1]Color{data_color.COLOR_BlACK} ** @typeInfo(ContributionEnum).Enum.fields.len,
+            .contribution_buffer = COLOR_BLACK,
+            .contribution_to_color = [1]Color{COLOR_BLACK} ** @typeInfo(ContributionEnum).Enum.fields.len,
             .sample_nbr_invert = sample_nbr_invert,
             .sample_aa_nbr_invert = sample_antialiasing_nbr_invert,
             .sample_weight = sample_nbr_invert * sample_antialiasing_nbr_invert,
             .ray_total_length = 0,
         };
         for (controller_aov.array_aov_standard.items) |aov| {
-            try ret.aov_to_color.put(aov, data_color.COLOR_BlACK);
+            try ret.aov_to_color.put(aov, COLOR_BLACK);
             var is_aov_raytraced: bool = true;
             for (definitions.AovStandardNonRaytraced) |item| {
                 if (item == aov) {
@@ -62,16 +63,14 @@ pub const ScratchBuffer = struct {
     pub fn reset(self: *Self) void {
         var it1 = self.aov_to_color.iterator();
         while (it1.next()) |item| {
-            item.value_ptr.* = data_color.COLOR_BlACK;
+            item.value_ptr.* = COLOR_BLACK;
         }
 
         for (&self.contribution_to_color) |*c| {
-            c.* = data_color.COLOR_BlACK;
+            c.* = COLOR_BLACK;
         }
 
-        for (&self.contribution_to_color_buffer) |*c| {
-            c.* = data_color.COLOR_BlACK;
-        }
+        self.contribution_buffer = COLOR_BLACK;
 
         self.ray_total_length = 0;
     }
@@ -115,33 +114,22 @@ pub const ScratchBuffer = struct {
 
     pub fn add_to_contribution_buffer(
         self: *Self,
-        contribution_id: ContributionEnum,
         color: Color,
     ) void {
+        if (self.contribution_buffer.check_is_equal(COLOR_BLACK)) {
+            self.contribution_buffer = data_color.COLOR_WHITE;
+        }
+        self.contribution_buffer = self.contribution_buffer.multiply_color(color);
+    }
+
+    pub fn reset_contribution_buffer(self: *Self) void {
+        self.contribution_buffer = COLOR_BLACK;
+    }
+
+    pub fn dump_contribution_buffer(self: *Self, contribution_id: ContributionEnum) void {
         const i = @intFromEnum(contribution_id);
-        var contribution_value = self.contribution_to_color_buffer[i];
-        if (contribution_value.check_is_equal(data_color.COLOR_BlACK)) {
-            contribution_value = data_color.COLOR_WHITE;
-        }
-        self.contribution_to_color_buffer[i] = contribution_value.multiply_color(color);
-    }
-
-    pub fn reset_contribution_buffer(self: *Self, contribution_id: ContributionEnum) void {
-        self.contribution_to_color_buffer[@intFromEnum(contribution_id)] = data_color.COLOR_BlACK;
-    }
-
-    pub fn reset_all_contribution_buffer(self: *Self) void {
-        for (&self.contribution_to_color_buffer) |*c| {
-            c.* = data_color.COLOR_BlACK;
-        }
-    }
-
-    pub fn dump_contribution_buffer(self: *Self) void {
-        var i: usize = 0;
-        while (i < self.contribution_to_color_buffer.len) : (i += 1) {
-            const value = self.contribution_to_color_buffer[i].product(self.sample_weight);
-            self.contribution_to_color[i] = self.contribution_to_color[i].sum_color(value);
-        }
+        const value = self.contribution_buffer.product(self.sample_weight);
+        self.contribution_to_color[i] = self.contribution_to_color[i].sum_color(value);
     }
 
     pub fn log_debug_contribution(self: *Self) void {
@@ -167,7 +155,7 @@ pub const ScratchBuffer = struct {
         const contribution_specular_direct = self.get_contribution(ContributionEnum.SpecularDirect);
         const contribution_specular_indirect = self.get_contribution(ContributionEnum.SpecularIndirect);
 
-        var beauty = data_color.COLOR_BlACK;
+        var beauty = COLOR_BLACK;
 
         beauty.sum_to_color(contribution_emission);
         beauty.sum_to_color(contribution_diffuse_direct);
@@ -175,12 +163,12 @@ pub const ScratchBuffer = struct {
         beauty.sum_to_color(contribution_specular_direct);
         beauty.sum_to_color(contribution_specular_indirect);
 
-        var direct = data_color.COLOR_BlACK;
+        var direct = COLOR_BLACK;
         direct.sum_to_color(contribution_emission);
         direct.sum_to_color(contribution_diffuse_direct);
         direct.sum_to_color(contribution_specular_direct);
 
-        var indirect = data_color.COLOR_BlACK;
+        var indirect = COLOR_BLACK;
         indirect.sum_to_color(contribution_diffuse_indirect);
         indirect.sum_to_color(contribution_specular_indirect);
 

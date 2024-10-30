@@ -381,9 +381,8 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
     // ray tracing shading point for every sample
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
-        pixel_payload.reset_all_contribution_buffer();
+        pixel_payload.reset_contribution_buffer();
         try self.render_px_aa_sample_sp_sample_prim_ray(thread_idx, hit);
-        pixel_payload.dump_contribution_buffer();
     }
 }
 
@@ -407,7 +406,8 @@ fn render_px_aa_sample_sp_sample_prim_ray(
     // -- handling emission / lights --
     if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
         const emission = scatter_result.emission.?;
-        pixel_payload.add_to_contribution_buffer(ContributionEnum.Emission, emission);
+        pixel_payload.add_to_contribution_buffer(emission);
+        pixel_payload.dump_contribution_buffer(ContributionEnum.Emission);
         return;
     }
 
@@ -428,11 +428,10 @@ fn render_px_aa_sample_sp_sample_prim_ray(
     }
 
     // -- propagating rays
+    pixel_payload.add_to_contribution_buffer(attenuation);
 
     // --- * diffuse
     if (scatter_result.ray_diffuse != null) {
-        pixel_payload.add_to_contribution_buffer(ContributionEnum.DiffuseDirect, attenuation);
-        pixel_payload.add_to_contribution_buffer(ContributionEnum.DiffuseIndirect, attenuation);
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
         pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
@@ -442,8 +441,6 @@ fn render_px_aa_sample_sp_sample_prim_ray(
 
     // --- * specular
     if (scatter_result.ray_specular != null) {
-        pixel_payload.add_to_contribution_buffer(ContributionEnum.SpecularDirect, attenuation);
-        pixel_payload.add_to_contribution_buffer(ContributionEnum.SpecularIndirect, attenuation);
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
         pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
@@ -471,28 +468,30 @@ fn render_px_aa_sample_sp_sample_sec_ray(
         pixel_payload.ray_total_length,
     );
 
-    // -- determining which contribution we are working on.
-    const is_direct: bool = bounce_idx < 2;
-    const contribution = switch (ray_type) {
-        .Specular => if (is_direct) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
-        .Diffuse => if (is_direct) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
-    };
-
     // -- handling emission / lights --
     if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
+
+        // -- determining which contribution we are working on.
+        const is_direct: bool = bounce_idx < 2;
+        const contribution = switch (ray_type) {
+            .Specular => if (is_direct) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
+            .Diffuse => if (is_direct) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
+        };
+
         const emission = scatter_result.emission.?;
-        pixel_payload.add_to_contribution_buffer(contribution, emission);
+        pixel_payload.add_to_contribution_buffer(emission);
+        pixel_payload.dump_contribution_buffer(contribution);
         return;
     }
 
     // -- if nothing was hit, blacking out contribution.
     if (hit.does_hit == 0) {
-        pixel_payload.reset_contribution_buffer(contribution);
+        pixel_payload.reset_contribution_buffer();
         return;
     }
 
     //  -- adding the contribution.
-    pixel_payload.add_to_contribution_buffer(contribution, scatter_result.attenuation);
+    pixel_payload.add_to_contribution_buffer(scatter_result.attenuation);
 
     // -- if hit skydome, ending raytracing.
     switch (hit.handle_hittable) {
@@ -504,7 +503,7 @@ fn render_px_aa_sample_sp_sample_sec_ray(
 
     // -- if bounce limit reached, returning.
     if (bounce_idx == self.render_info.bounces) {
-        pixel_payload.reset_contribution_buffer(contribution);
+        pixel_payload.reset_contribution_buffer();
         return;
     }
 
