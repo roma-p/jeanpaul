@@ -134,7 +134,7 @@ pub fn render(
 }
 
 fn prepare_render(self: *Renderer, camera_handle: data_handles.HandleCamera, thread_nbr: usize) !void {
-    // 1. prepare control pixel_payload.check_has_aov(ler img.
+    // 1. prepare control scratch_buffer.check_has_aov(ler img.
     for (self.controller_scene.controller_aov.array_aov_standard.items) |aov| {
         const aov_name = @tagName(aov);
         const img_layer_idx = try self.controller_img.register_image_layer(aov_name);
@@ -178,11 +178,11 @@ fn dispose_render(self: *Renderer) void {
 // -- Render entry point -----------------------------------------------------
 
 fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
-    var pixel_payload = &self.array_render_data_per_thread.items[thread_idx].scratch_buffer;
-    pixel_payload.reset();
+    var scratch_buffer = &self.array_render_data_per_thread.items[thread_idx].scratch_buffer;
+    scratch_buffer.reset();
 
     // time per pixel AOV handling.
-    const is_time_to_count: bool = pixel_payload.check_has_aov(AovStandardEnum.DebugTimePerPixel);
+    const is_time_to_count: bool = scratch_buffer.check_has_aov(AovStandardEnum.DebugTimePerPixel);
     var time_start: i64 = undefined;
     if (is_time_to_count) time_start = std.time.timestamp();
 
@@ -193,8 +193,8 @@ fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     }
 
     // writing aov from contributions data.
-    pixel_payload.dump_contributions_to_aovs();
-    var it = pixel_payload.aov_to_color.iterator();
+    scratch_buffer.dump_contributions_to_aovs();
+    var it = scratch_buffer.aov_to_color.iterator();
     while (it.next()) |item| {
         const layer_index = self.aov_to_image_layer.get(item.key_ptr.*) orelse unreachable;
         try self.controller_img.write_to_px(x, y, layer_index, item.value_ptr.*);
@@ -205,7 +205,7 @@ fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
         const time_end = std.time.timestamp();
         const elapsed: i64 = time_end - time_start;
         const elapsed_as_f32: f32 = @as(f32, @floatFromInt(elapsed));
-        pixel_payload.set_aov(
+        scratch_buffer.set_aov(
             AovStandardEnum.DebugTimePerPixel,
             data_color.Color.create_from_value_not_clamped(elapsed_as_f32),
         );
@@ -214,7 +214,7 @@ fn render_px(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
 
 fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void {
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.scratch_buffer;
+    var scratch_buffer = &render_data_per_thread.scratch_buffer;
     var controller_material = &self.controller_scene.controller_material;
 
     const x_f32 = utils_zig.cast_u16_to_f32(x);
@@ -239,14 +239,14 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
 
     if (hit.does_hit == 0) return;
 
-    pixel_payload.ray_total_length = hit.t;
+    scratch_buffer.ray_total_length = hit.t;
     const ptr_mat = try controller_material.get_mat_pointer(hit.handle_mat);
 
     // -- write AOV that only depends on primary rays
 
-    pixel_payload.add_aa_sample_to_aov(AovStandardEnum.Alpha, data_color.COLOR_WHITE);
+    scratch_buffer.add_aa_sample_to_aov(AovStandardEnum.Alpha, data_color.COLOR_WHITE);
 
-    pixel_payload.add_aa_sample_to_aov(
+    scratch_buffer.add_aa_sample_to_aov(
         AovStandardEnum.Normal,
         data_color.Color{
             .r = (hit.n.x + 1) / 2,
@@ -255,7 +255,7 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
         },
     );
 
-    pixel_payload.add_aa_sample_to_aov(
+    scratch_buffer.add_aa_sample_to_aov(
         AovStandardEnum.Albedo,
         switch (ptr_mat.*) {
             .Lambertian => |v| v.base_color,
@@ -266,7 +266,7 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
     );
 
     // /!\ value not clamped...
-    pixel_payload.add_aa_sample_to_aov(
+    scratch_buffer.add_aa_sample_to_aov(
         AovStandardEnum.Depth,
         data_color.Color.create_from_value_not_clamped(hit.t),
     );
@@ -274,7 +274,7 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
     // ray tracing shading point for every sample
     var sample_i: usize = 0;
     while (sample_i < self.render_info.samples_nbr) : (sample_i += 1) {
-        pixel_payload.reset_contribution_buffer();
+        scratch_buffer.reset_contribution_buffer();
         try self.render_px_aa_sample_sp_sample_prim_ray(thread_idx, hit);
     }
 }
@@ -286,21 +286,22 @@ fn render_px_aa_sample_sp_sample_prim_ray(
 ) !void {
     // -- scattering shading point. --
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.scratch_buffer;
+    var scratch_buffer = &render_data_per_thread.scratch_buffer;
     const scatter_result = try self.scatter(
         hit.p,
         hit.ray_direction,
         hit.n,
         &render_data_per_thread.rnd,
         hit.handle_mat,
-        pixel_payload.ray_total_length,
+        scratch_buffer.ray_total_length,
+        hit.face_side,
     );
 
     // -- handling emission / lights --
     if (scatter_result.is_scatterred == 0 and scatter_result.emission != null) {
         const emission = scatter_result.emission.?;
-        pixel_payload.add_to_contribution_buffer(emission);
-        pixel_payload.dump_contribution_buffer(ContributionEnum.Emission);
+        scratch_buffer.add_to_contribution_buffer(emission);
+        scratch_buffer.dump_contribution_buffer(ContributionEnum.Emission);
         return;
     }
 
@@ -314,19 +315,17 @@ fn render_px_aa_sample_sp_sample_prim_ray(
 
     // -- if hit skydome, ending raytracing.
     switch (hit.handle_hittable) {
-        .HandleEnv => {
-            return;
-        },
+        .HandleEnv => return,
         inline else => {},
     }
 
     // -- propagating rays
-    pixel_payload.add_to_contribution_buffer(attenuation);
+    scratch_buffer.add_to_contribution_buffer(attenuation);
 
     // --- * diffuse
     if (scatter_result.ray_diffuse != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
-        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
             try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, RayType.Diffuse);
         }
@@ -335,7 +334,7 @@ fn render_px_aa_sample_sp_sample_prim_ray(
     // --- * specular
     if (scatter_result.ray_specular != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
-        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
             try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, RayType.Specular);
         }
@@ -351,14 +350,14 @@ fn render_px_aa_sample_sp_sample_sec_ray(
 ) !void {
     // -- scattering shading point. --
     var render_data_per_thread = &self.array_render_data_per_thread.items[thread_idx];
-    var pixel_payload = &render_data_per_thread.scratch_buffer;
+    var scratch_buffer = &render_data_per_thread.scratch_buffer;
     const scatter_result = try self.scatter(
         hit.p,
         hit.ray_direction,
         hit.n,
         &render_data_per_thread.rnd,
         hit.handle_mat,
-        pixel_payload.ray_total_length,
+        scratch_buffer.ray_total_length,
     );
 
     // -- handling emission / lights --
@@ -372,31 +371,29 @@ fn render_px_aa_sample_sp_sample_sec_ray(
         };
 
         const emission = scatter_result.emission.?;
-        pixel_payload.add_to_contribution_buffer(emission);
-        pixel_payload.dump_contribution_buffer(contribution);
+        scratch_buffer.add_to_contribution_buffer(emission);
+        scratch_buffer.dump_contribution_buffer(contribution);
         return;
     }
 
     // -- if nothing was hit, blacking out contribution.
     if (hit.does_hit == 0) {
-        pixel_payload.reset_contribution_buffer();
+        scratch_buffer.reset_contribution_buffer();
         return;
     }
 
     //  -- adding the contribution.
-    pixel_payload.add_to_contribution_buffer(scatter_result.attenuation);
+    scratch_buffer.add_to_contribution_buffer(scatter_result.attenuation);
 
     // -- if hit skydome, ending raytracing.
     switch (hit.handle_hittable) {
-        .HandleEnv => {
-            return;
-        },
+        .HandleEnv => return,
         inline else => {},
     }
 
     // -- if bounce limit reached, returning.
     if (bounce_idx == self.render_info.bounces) {
-        pixel_payload.reset_contribution_buffer();
+        scratch_buffer.reset_contribution_buffer();
         return;
     }
 
@@ -405,7 +402,7 @@ fn render_px_aa_sample_sp_sample_sec_ray(
     // --- * diffuse
     if (scatter_result.ray_diffuse != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_diffuse.?);
-        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
             try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, bounce_idx + 1, new_hit, ray_type);
         }
@@ -414,7 +411,7 @@ fn render_px_aa_sample_sp_sample_sec_ray(
     // --- * specular
     if (scatter_result.ray_specular != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
-        pixel_payload.ray_total_length += new_hit.t; // TODO not correct...
+        scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
             try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, bounce_idx + 1, new_hit, ray_type);
         }
