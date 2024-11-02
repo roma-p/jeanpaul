@@ -9,6 +9,7 @@ pub const MaterialEnum = enum {
     Lambertian,
     DiffuseLight,
     Metal,
+    Dielectric,
     Phong,
 };
 
@@ -46,6 +47,8 @@ pub const AovStandardEnum = enum {
     SpecularDirect,
     SpecularIndirect,
 
+    Transmission,
+
     DebugCheeseNan,
     DebugTimePerPixel,
 };
@@ -80,6 +83,10 @@ pub const Material = union(MaterialEnum) {
         base_color: Color = data_color.COLOR_GREY,
         ambiant: f32 = 0.05,
         fuzz: f32 = 0,
+    },
+    Dielectric: struct {
+        base_color: Color = data_color.COLOR_GREY,
+        ior: f32 = 1,
     },
     Phong: struct {},
 };

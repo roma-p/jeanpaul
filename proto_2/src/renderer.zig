@@ -62,7 +62,7 @@ array_render_data_per_thread: std.ArrayList(RenderDataPerThread),
 
 const AOV_NOT_CLAMP = [_]AovStandardEnum{AovStandardEnum.Depth};
 
-const RayType = enum { Specular, Diffuse };
+const RayType = enum { Specular, Diffuse, Transmission };
 
 pub fn init(controller_scene: *ControllereScene) !Renderer {
     return .{
@@ -261,6 +261,7 @@ fn render_px_aa_sample(self: *Renderer, x: u16, y: u16, thread_idx: usize) !void
             .Lambertian => |v| v.base_color,
             .DiffuseLight => |v| v.color,
             .Metal => |v| v.base_color,
+            .Dielectric => |v| v.base_color,
             else => unreachable,
         },
     );
@@ -331,12 +332,27 @@ fn render_px_aa_sample_sp_sample_prim_ray(
         }
     }
 
+    scratch_buffer.reset_contribution_buffer();
+    scratch_buffer.add_to_contribution_buffer(attenuation);
+
     // --- * specular
     if (scatter_result.ray_specular != null) {
         const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_specular.?);
         scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
         if (new_hit.does_hit == 1) {
             try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, RayType.Specular);
+        }
+    }
+
+    scratch_buffer.reset_contribution_buffer();
+    scratch_buffer.add_to_contribution_buffer(attenuation);
+
+    // --- * transmission
+    if (scatter_result.ray_transmission != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_transmission.?);
+        scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, RayType.Transmission);
         }
     }
 }
@@ -358,6 +374,7 @@ fn render_px_aa_sample_sp_sample_sec_ray(
         &render_data_per_thread.rnd,
         hit.handle_mat,
         scratch_buffer.ray_total_length,
+        hit.face_side,
     );
 
     // -- handling emission / lights --
@@ -368,6 +385,7 @@ fn render_px_aa_sample_sp_sample_sec_ray(
         const contribution = switch (ray_type) {
             .Specular => if (is_direct) ContributionEnum.SpecularDirect else ContributionEnum.SpecularIndirect,
             .Diffuse => if (is_direct) ContributionEnum.DiffuseDirect else ContributionEnum.DiffuseIndirect,
+            .Transmission => ContributionEnum.Transmission,
         };
 
         const emission = scatter_result.emission.?;
@@ -416,6 +434,15 @@ fn render_px_aa_sample_sp_sample_sec_ray(
             try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, bounce_idx + 1, new_hit, ray_type);
         }
     }
+
+    // --- * transmission
+    if (scatter_result.ray_transmission != null) {
+        const new_hit = self.renderer_ray_collision.send_ray_on_hittable(scatter_result.ray_transmission.?);
+        scratch_buffer.ray_total_length += new_hit.t; // TODO not correct...
+        if (new_hit.does_hit == 1) {
+            try self.render_px_aa_sample_sp_sample_sec_ray(thread_idx, 1, new_hit, ray_type);
+        }
+    }
 }
 
 pub fn scatter(
@@ -426,6 +453,7 @@ pub fn scatter(
     rng: *RndGen,
     handle_mat: data_handles.HandleMaterial,
     ray_total_length: f32,
+    face_side: u1,
 ) !ScatterResult {
     const controller_material = &self.controller_scene.controller_material;
     const ptr_mat = try controller_material.get_mat_pointer(handle_mat);
@@ -454,6 +482,14 @@ pub fn scatter(
             v.base,
             v.ambiant,
             v.fuzz,
+            rng,
+        ),
+        .Dielectric => |v| utils_materials.scatter_dieletric(
+            p,
+            ray_direction,
+            normal,
+            v.base_color,
+            if (face_side == 1) 1 / v.ior else v.ior,
             rng,
         ),
         .Phong => unreachable,

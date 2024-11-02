@@ -17,6 +17,7 @@ pub const ScatterResult = struct {
     is_scatterred: u1 = 0,
     ray_diffuse: ?Ray = null,
     ray_specular: ?Ray = null,
+    ray_transmission: ?Ray = null,
     attenuation: Color = data_color.COLOR_EMPTY,
     emission: ?Color = null,
 };
@@ -56,8 +57,7 @@ pub fn scatter_metal(
     fuzz: f32,
     rng: *RndGen,
 ) !ScatterResult {
-    const a = 2 * ray_direction.product_dot(normal);
-    var direction = ray_direction.substract_vector(normal.product(a)).normalize();
+    var direction = reflect(ray_direction, normal);
     const fuzz_alteration = utils_geo.gen_vec_random_spheric_normalized(rng).product(fuzz);
     direction = direction.sum_vector(fuzz_alteration);
 
@@ -82,6 +82,40 @@ pub fn scatter_metal(
     };
 }
 
+pub fn scatter_dieletric(
+    p: Vecf32,
+    ray_direction: Vecf32,
+    normal: Vecf32,
+    base_color: Color,
+    ior_fraction: f32,
+    rng: *RndGen,
+) ScatterResult {
+    const cos_theta = @min(1.0, ray_direction.product(-1).product_dot(normal));
+    const sin_theta = @min(1.0, std.math.sqrt(1.0 - cos_theta * cos_theta));
+
+    const cannot_refract = (ior_fraction * sin_theta > 1.0);
+
+    if (cannot_refract or schlick_reflectance_idx(cos_theta, ior_fraction) > rng.random().float(f32)) {
+        return ScatterResult{
+            .is_scatterred = 1,
+            .ray_transmission = .{
+                .o = p,
+                .d = reflect(ray_direction, normal),
+            },
+            .attenuation = base_color,
+        };
+    } else {
+        return ScatterResult{
+            .is_scatterred = 1,
+            .ray_transmission = .{
+                .o = p,
+                .d = refract(ray_direction, normal, ior_fraction),
+            },
+            .attenuation = base_color,
+        };
+    }
+}
+
 pub fn get_emitted_color(
     color: Color,
     intensity: f32,
@@ -98,4 +132,22 @@ pub fn get_emitted_color(
         .is_scatterred = 0,
         .emission = color.product(with_decay),
     };
+}
+
+pub fn reflect(ray_direction: Vecf32, normal: Vecf32) Vecf32 {
+    const a = 2 * ray_direction.product_dot(normal);
+    return ray_direction.substract_vector(normal.product(a)).normalize();
+}
+
+pub fn refract(ray_direction: Vecf32, normal: Vecf32, ior_fraction: f32) Vecf32 {
+    const cos_theta = @min(1.0, ray_direction.product(-1).product_dot(normal));
+    const r_dir_perp = ray_direction.sum_vector(normal.product(cos_theta)).product(ior_fraction);
+    const r_dir_prll = normal.product(-1 * std.math.sqrt(@abs(1 - r_dir_perp.compute_length_squared())));
+    return r_dir_perp.sum_vector(r_dir_prll).normalize();
+}
+
+pub fn schlick_reflectance_idx(cos_theta: f32, ior_fraction: f32) f32 {
+    const r0 = (1 - ior_fraction) / (1 + ior_fraction);
+    const r02 = r0 * r0;
+    return r02 + (1 - r02) * std.math.pow(f32, 1 - cos_theta, 5);
 }

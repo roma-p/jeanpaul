@@ -30,12 +30,20 @@ test "prepare_render" {
 
     // -- MATERIAL --
 
+    const handle_mat_dielectric = try controller_mat.add_material(
+        "dielectric",
+        Material{ .Dielectric = .{
+            .base_color = data_color.Color{ .r = 1, .g = 1, .b = 1 },
+            .ior = 1.33,
+        } },
+    );
+
     const handle_mat_red_metal = try controller_mat.add_material(
         "red_metal",
         Material{ .Metal = .{
             .base_color = data_color.Color{ .r = 1, .g = 0.3, .b = 0.4 },
             .base = 1,
-            .fuzz = 0.1,
+            .fuzz = 0.03,
         } },
     );
 
@@ -59,7 +67,7 @@ test "prepare_render" {
         Material{ .DiffuseLight = .{
             .color = data_color.COLOR_WHITE,
             .intensity = 50,
-            .exposition = 2,
+            .exposition = 4,
             .decay_mode = definitions.LightDecayMode.Quadratic,
         } },
     );
@@ -108,17 +116,24 @@ test "prepare_render" {
         handle_mat_red_metal,
     );
 
+    _ = try controller_object.add_shape(
+        "sphere_4",
+        Shape{ .ImplicitSphere = .{ .radius = 5 } },
+        TMatrix.create_at_position(Vec3f32{ .x = 24, .y = 0, .z = 4 }),
+        handle_mat_dielectric,
+    );
+
     const handle_cam: data_handles.HandleCamera = try controller_object.add_camera(
         "camera_1",
         Camera{ .Perspective = .{} },
-        TMatrix.create_at_position(Vec3f32{ .x = 0, .y = 0, .z = 47 }),
+        TMatrix.create_at_position(Vec3f32{ .x = 6, .y = 0, .z = 50 }),
     );
 
     controller_scene.render_settings.width = 1920;
     controller_scene.render_settings.height = 1080;
     controller_scene.render_settings.tile_size = 128;
-    controller_scene.render_settings.samples = 4;
-    controller_scene.render_settings.samples_antialiasing = 4;
+    controller_scene.render_settings.samples = 8;
+    controller_scene.render_settings.samples_antialiasing = 3;
     controller_scene.render_settings.bounces = 6;
     controller_scene.render_settings.render_type = data_render_settings.RenderType.Tile;
     controller_scene.render_settings.render_single_px_x = 320;
@@ -141,6 +156,7 @@ test "prepare_render" {
     try controller_aov.add_aov_standard(AovStandard.Specular);
     try controller_aov.add_aov_standard(AovStandard.SpecularDirect);
     try controller_aov.add_aov_standard(AovStandard.SpecularIndirect);
+    try controller_aov.add_aov_standard(AovStandard.Transmission);
 
     try controller_aov.add_aov_standard(AovStandard.DebugCheeseNan);
 

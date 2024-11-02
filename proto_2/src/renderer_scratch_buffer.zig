@@ -16,6 +16,7 @@ pub const ContributionEnum = enum {
     DiffuseIndirect,
     SpecularDirect,
     SpecularIndirect,
+    Transmission,
 };
 
 pub const ScratchBuffer = struct {
@@ -154,6 +155,7 @@ pub const ScratchBuffer = struct {
         const contribution_diffuse_indirect = self.get_contribution(ContributionEnum.DiffuseIndirect);
         const contribution_specular_direct = self.get_contribution(ContributionEnum.SpecularDirect);
         const contribution_specular_indirect = self.get_contribution(ContributionEnum.SpecularIndirect);
+        const contribution_transmission = self.get_contribution(ContributionEnum.Transmission);
 
         var beauty = COLOR_BLACK;
 
@@ -162,11 +164,13 @@ pub const ScratchBuffer = struct {
         beauty.sum_to_color(contribution_diffuse_indirect);
         beauty.sum_to_color(contribution_specular_direct);
         beauty.sum_to_color(contribution_specular_indirect);
+        beauty.sum_to_color(contribution_transmission);
 
         var direct = COLOR_BLACK;
         direct.sum_to_color(contribution_emission);
         direct.sum_to_color(contribution_diffuse_direct);
         direct.sum_to_color(contribution_specular_direct);
+        direct.sum_to_color(contribution_transmission);
 
         var indirect = COLOR_BLACK;
         indirect.sum_to_color(contribution_diffuse_indirect);
@@ -188,5 +192,6 @@ pub const ScratchBuffer = struct {
         self.set_aov(AovStandardEnum.DiffuseIndirect, contribution_diffuse_indirect);
         self.set_aov(AovStandardEnum.SpecularDirect, contribution_specular_direct);
         self.set_aov(AovStandardEnum.SpecularIndirect, contribution_specular_indirect);
+        self.set_aov(AovStandardEnum.Transmission, contribution_transmission);
     }
 };
