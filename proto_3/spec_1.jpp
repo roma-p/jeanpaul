@@ -1,0 +1,51 @@
+#! format 0.1.1
+#! render_default view1 frame10
+
+>>> FILE_SECTION RENDER <<<
+
+# how to inherits render settings?
+RenderSettings{
+   resolution=(1024,1028),
+   camera="main_camera"
+}
+
+RenderSettings{
+   name="auto"
+}
+
+>>> SECTION SCENE <<<
+
+>>> Scene{name="auto"} <<<
+
+>>> Scene{
+  name="frame10",
+  using=(
+    "path/to/file.jpp@DEFINITIONS.env#env",
+	"path/to/file.jpp@SCENES.scene1#scene1",
+	"path/to/file.jpp@DEFINITIONS.mat#mat",
+  ),
+  inherits="scene1"
+} <<<
+
+Instance{
+   name="red_ball",
+   src="env.ball",
+   mat="mat.metal_red",
+   overrides={
+     radius=10,
+   },
+   tmat=()
+}
+
+>>> SECTION DEFINITIONS <<<
+
+>>> Definition{name="auto"} <<<
+
+>>> Definition{name="lol"}
+
+object.Light{
+   plein="de",
+   param="ducul",
+}
+
+>>> SECTION PAYLOAD <<<

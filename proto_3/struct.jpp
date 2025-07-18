@@ -1,0 +1,6 @@
+
+
+object.ImplicitSphere{
+   name="sphere1",
+   radius=10,
+}
