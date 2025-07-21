@@ -27,16 +27,26 @@ RenderSettings{
   inherits="scene1"
 } <<<
 
-Instance{
-   name="red_ball",
-   src="env.ball",
-   mat="mat.metal_red",
-   overrides={
-     radius=10,
-   },
-   tmat=()
-}
-
+# Scene(
+#   name="frame10",
+#   using=(
+#     "path/to/file.jpp@DEFINITIONS.env#env",
+# 	"path/to/file.jpp@SCENES.scene1#scene1",
+# 	"path/to/file.jpp@DEFINITIONS.mat#mat",
+#   ),
+#   inherits="scene1"
+# ){
+#    Instance{
+#       name="red_ball",
+#       src="env.ball",
+#       mat="mat.metal_red",
+#       overrides={
+# 	radius=10,
+#       },
+#       tmat=()
+#    }
+# }
+#
 >>> SECTION DEFINITIONS <<<
 
 >>> Definition{name="auto"} <<<

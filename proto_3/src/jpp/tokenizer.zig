@@ -1,6 +1,8 @@
 const std = @import("std");
 
 pub const Token = struct {
+    tag: Tag,
+    loc: Loc,
 
     pub const Loc = struct {
         start: usize,
@@ -15,7 +17,7 @@ pub const Token = struct {
         return keywords.get(bytes);
     }
 
-    pub const Tag = enum{
+    pub const Tag = enum {
         invalid,
         identifier,
         string_literal,
@@ -30,8 +32,9 @@ pub const Token = struct {
         equal,
         comma,
         period,
+        eof,
 
-        pub fn lexeme(tag: Tag) ?[]const u8{
+        pub fn lexeme(tag: Tag) ?[]const u8 {
             return switch (tag) {
                 .invalid,
                 .identifier,
@@ -61,57 +64,65 @@ pub const Token = struct {
                 else => unreachable,
             };
         }
-
     };
-
 };
 
 pub const Tokenizer = struct {
     buffer: [:0]const u8,
     index: usize,
 
-    pub fn init(buffer: [:0]const u8) void {
+    pub fn init(buffer: [:0]const u8) Tokenizer {
         return .{
             .buffer = buffer,
             .index = 0,
         };
     }
 
-    const State = enum{
+    const State = enum {
         start,
         string_literal,
         identifier,
+        invalid,
     };
 
     pub fn next(self: *Tokenizer) Token {
-        var result: Token = .{
-            .tag = undefined,
-            .loc = .{
-                .start = self.index,
-                .end = undefined,
-            }
-        };
+        var result: Token = .{ .tag = undefined, .loc = .{
+            .start = self.index,
+            .end = undefined,
+        } };
         state: switch (State.start) {
             .start => switch (self.buffer[self.index]) {
-                // TODO: EOF
+                0 => {
+                    if (self.index == self.buffer.len) {
+                        if (self.index == self.buffer.len) {
+                            return .{
+                                .tag = .eof,
+                                .loc = .{
+                                    .start = self.index,
+                                    .end = self.index,
+                                },
+                            };
+                        }
+                    }
+                },
                 ' ', '\n', '\t', '\r' => {
                     self.index += 1;
                     result.loc.start = self.index;
-                    continue : state .start;
+                    continue :state .start;
                 },
                 '"' => {
                     result.tag = .string_literal;
-                    continue: state .string_literal;
+                    continue :state .string_literal;
                 },
                 'a'...'z', 'A'...'Z', '_' => {
                     result.tag = .identifier;
                     continue :state .identifier;
                 },
-                '0'...'9' => {
-                    result.tag = .number_literal;
-                    self.index +=1;
-                    continue :state .int;
-                },
+                // '0'...'9' => {
+                //     result.tag = .number_literal;
+                //     self.index += 1;
+                //     continue :state .int;
+                // },
                 '(' => {
                     result.tag = .l_paren;
                     self.index += 1;
@@ -136,19 +147,34 @@ pub const Tokenizer = struct {
                     result.tag = .comma;
                     self.index += 1;
                 },
-                '.' => continue :state .period,
+                // '.' => continue :state .period,
+                else => continue :state .invalid,
             },
             .identifier => {
                 self.index += 1;
-                'a'...'z', 'A'...'Z', '_', '0'...'9' => continue :state .identifier,
-                else => {},
+                switch (self.buffer[self.index]) {
+                    'a'...'z', 'A'...'Z', '_', '0'...'9' => continue :state .identifier,
+                    else => {},
+                }
             },
             .string_literal => {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
                     // missing end
-                    '"' => self.index +1
+                    '"' => self.index += 1,
                     else => continue :state .string_literal,
+                }
+            },
+            .invalid => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => if (self.index == self.buffer.len) {
+                        result.tag = .invalid;
+                    } else {
+                        continue :state .invalid;
+                    },
+                    '\n' => result.tag = .invalid,
+                    else => continue :state .invalid,
                 }
             },
         }
@@ -156,3 +182,68 @@ pub const Tokenizer = struct {
         return result;
     }
 };
+
+test "tokeniser simple struct" {
+    var tokeniser = Tokenizer.init("Scene{ name=\"prout\"}");
+
+    const t1 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.identifier, t1.tag);
+    try std.testing.expectEqual(0, t1.loc.start);
+    try std.testing.expectEqual(5, t1.loc.end);
+
+    const t2 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.l_brace, t2.tag);
+    try std.testing.expectEqual(5, t2.loc.start);
+    try std.testing.expectEqual(6, t2.loc.end);
+
+    const t3 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.identifier, t3.tag);
+    try std.testing.expectEqual(7, t3.loc.start);
+    try std.testing.expectEqual(11, t3.loc.end);
+
+    const t4 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.equal, t4.tag);
+    try std.testing.expectEqual(11, t4.loc.start);
+    try std.testing.expectEqual(12, t4.loc.end);
+
+    const t5 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.string_literal, t5.tag);
+    try std.testing.expectEqual(12, t5.loc.start);
+    try std.testing.expectEqual(19, t5.loc.end);
+
+    const t6 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.r_brace, t6.tag);
+    try std.testing.expectEqual(19, t6.loc.start);
+    try std.testing.expectEqual(20, t6.loc.end);
+
+    const t7 = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.eof, t7.tag);
+    try std.testing.expectEqual(20, t7.loc.start);
+    try std.testing.expectEqual(20, t7.loc.end);
+}
+
+fn testTokeniser(source: [:0]const u8, expected_token_tags: []const Token.Tag) !void {
+    var tokeniser = Tokenizer.init(source);
+    for (expected_token_tags) |expected_token_tag| {
+        const token = tokeniser.next();
+        try std.testing.expectEqual(expected_token_tag, token.tag);
+    }
+    const last_token = tokeniser.next();
+    try std.testing.expectEqual(Token.Tag.eof, last_token.tag);
+    try std.testing.expectEqual(source.len, last_token.loc.start);
+    try std.testing.expectEqual(source.len, last_token.loc.end);
+}
+
+test "testTokeniser utils" {
+    try testTokeniser(
+        "Scene{ name=\"prout\"}",
+        &.{
+            .identifier,
+            .l_brace,
+            .identifier,
+            .equal,
+            .string_literal,
+            .r_brace,
+        },
+    );
+}
