@@ -85,7 +85,6 @@ pub const Tokenizer = struct {
         invalid,
         line_comment_start,
         line_comment,
-        slash,
     };
 
     pub fn next(self: *Tokenizer) Token {
@@ -301,10 +300,11 @@ test "testTokeniser simple struct at end of line" {
 test "testTokeniser simple struct but multiline." {
     try testTokeniser(
         \\Scene{
-        \\  name=prout, // best name ever
-        \\  from=tadam // best name ever
+        \\  name="prout", // best name ever
+        \\  from="tadam" // best name ever
         \\}
-        ,&.{
+    ,
+        &.{
             .identifier,
             .l_brace,
             .identifier,
