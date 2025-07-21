@@ -1,9 +1,12 @@
-#! format 0.1.1
-#! render_default view1 frame10
+#format 0.1.1
 
->>> FILE_SECTION RENDER <<<
+>>> SECTION HEADER
 
-# how to inherits render settings?
+@renderDefault(view="view1", scene="frame10")
+@import("path/to/file.jpp::DefDefault", "lul")
+
+
+// how to inherits render settings?
 RenderSettings{
    resolution=(1024,1028),
    camera="main_camera"
@@ -13,41 +16,39 @@ RenderSettings{
    name="auto"
 }
 
->>> SECTION SCENE <<<
+>>> SECTION SCENE
 
->>> Scene{name="auto"} <<<
-
->>> Scene{
+Scene{
   name="frame10",
   using=(
-    "path/to/file.jpp@DEFINITIONS.env#env",
-	"path/to/file.jpp@SCENES.scene1#scene1",
-	"path/to/file.jpp@DEFINITIONS.mat#mat",
+     "lul.DEFINITIONS.env#env",
+     "lul.SCENES.scene1#scene1",
+     "lul.DEFINITIONS.mat#mat",
   ),
   inherits="scene1"
-} <<<
+}
 
-# Scene(
-#   name="frame10",
-#   using=(
-#     "path/to/file.jpp@DEFINITIONS.env#env",
-# 	"path/to/file.jpp@SCENES.scene1#scene1",
-# 	"path/to/file.jpp@DEFINITIONS.mat#mat",
-#   ),
-#   inherits="scene1"
-# ){
-#    Instance{
-#       name="red_ball",
-#       src="env.ball",
-#       mat="mat.metal_red",
-#       overrides={
-# 	radius=10,
-#       },
-#       tmat=()
-#    }
-# }
-#
->>> SECTION DEFINITIONS <<<
+// Scene(
+//   name="frame10",
+//   using=(
+//      "lul.DEFINITIONS.env#env",
+// 	"lul.SCENES.scene1#scene1",
+// 	"lul.DEFINITIONS.mat#mat",
+//   ),
+//   inherits="scene1"
+// ){
+//    Instance{
+//       name="red_ball",
+//       src="env.ball",
+//       mat="mat.metal_red",
+//       overrides={
+// 	radius=10,
+//       },
+//       tmat=()
+//    }
+// }
+//
+>>> SECTION LIBRARY
 
 >>> Definition{name="auto"} <<<
 

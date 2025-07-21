@@ -1,0 +1,39 @@
+#format 0.1.1
+
+>>> JPPSECTION DESCRIPTION
+
+@renderDefault(view="default", scene="main")
+@import("path/to/file.jpp::Library.default", "lul")
+
+RenderSettings{ 
+   name="default",
+   resolution=(1024,1028),
+   camera="default_perpective",
+}
+
+Scene{
+  name="main",
+  content=(
+      Instance{
+	     name="default_perpective",
+		 src="default.default_perpective",
+		 tmat=ORIGIN,
+	  }
+  ),
+}
+
+Library{
+  name="default",
+  payload="default",
+  content= (
+     camera.Perpec{name=default_perpective},
+  )
+}
+
+>>> JPPSECTION PAYLOAD
+
+PayLoad{
+  name="default",
+}
+
+>>> 

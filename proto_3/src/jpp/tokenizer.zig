@@ -23,7 +23,6 @@ pub const Token = struct {
         string_literal,
         number_literal,
         hashbang,
-        comment,
         keyword_file_section, // ??? remove?
         l_paren,
         r_paren,
@@ -41,7 +40,6 @@ pub const Token = struct {
                 .string_literal,
                 .number_literal,
                 => null,
-
                 .hashbang => "#!",
                 .read_tag => ">>>",
                 .equal => "=",
@@ -61,6 +59,8 @@ pub const Token = struct {
                 .identifier => "an identifier",
                 .string_literal => "a string literal",
                 .number_literal => "a number literal",
+                .hashbang => "hashbang",
+                .comment => "a comment",
                 else => unreachable,
             };
         }
@@ -83,6 +83,9 @@ pub const Tokenizer = struct {
         string_literal,
         identifier,
         invalid,
+        line_comment_start,
+        line_comment,
+        slash,
     };
 
     pub fn next(self: *Tokenizer) Token {
@@ -147,6 +150,9 @@ pub const Tokenizer = struct {
                     result.tag = .comma;
                     self.index += 1;
                 },
+                '/' => {
+                    continue :state .line_comment_start;
+                },
                 // '.' => continue :state .period,
                 else => continue :state .invalid,
             },
@@ -163,6 +169,36 @@ pub const Tokenizer = struct {
                     // missing end
                     '"' => self.index += 1,
                     else => continue :state .string_literal,
+                }
+            },
+            .line_comment_start => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '/' => continue :state .line_comment,
+                    else => continue :state .invalid,
+                }
+            },
+
+            .line_comment => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => {
+                        if (self.index != self.buffer.len) {
+                            continue :state .invalid;
+                        } else return .{
+                            .tag = .eof,
+                            .loc = .{
+                                .start = self.index,
+                                .end = self.index,
+                            },
+                        };
+                    },
+                    '\n' => {
+                        self.index += 1;
+                        result.loc.start = self.index;
+                        continue :state .start;
+                    },
+                    else => continue :state .line_comment,
                 }
             },
             .invalid => {
@@ -243,6 +279,58 @@ test "testTokeniser utils" {
             .identifier,
             .equal,
             .string_literal,
+            .r_brace,
+        },
+    );
+}
+
+test "testTokeniser simple struct at end of line" {
+    try testTokeniser(
+        "Scene{ name=\"prout\"} // some comment to be ignored",
+        &.{
+            .identifier,
+            .l_brace,
+            .identifier,
+            .equal,
+            .string_literal,
+            .r_brace,
+        },
+    );
+}
+
+test "testTokeniser simple struct but multiline." {
+    try testTokeniser(
+        \\Scene{
+        \\  name=prout, // best name ever
+        \\  from=tadam // best name ever
+        \\}
+        ,&.{
+            .identifier,
+            .l_brace,
+            .identifier,
+            .equal,
+            .string_literal,
+            .comma,
+            .identifier,
+            .equal,
+            .string_literal,
+            .r_brace,
+        },
+    );
+}
+
+test "testTokeniser simple struct at end of line and return of line" {
+    try testTokeniser(
+        "Scene{ name=\"prout\"} // some comment to be ignored\nScene{}",
+        &.{
+            .identifier,
+            .l_brace,
+            .identifier,
+            .equal,
+            .string_literal,
+            .r_brace,
+            .identifier,
+            .l_brace,
             .r_brace,
         },
     );
