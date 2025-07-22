@@ -16,8 +16,8 @@ Scene{
   content=(
       Instance{
 	     name="default_perpective",
-		 src="default.default_perpective",
-		 tmat=ORIGIN,
+	     src="default.default_perpective",
+	     tmat=ORIGIN,
 	  }
   ),
 }
